@@ -10,6 +10,10 @@
 		cursor: pointer;
 	}
 
+	html.theme-loading body {
+		visibility: hidden;
+	}
+
 	body {
 		overflow: hidden;
 		position: fixed;

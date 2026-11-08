@@ -45,7 +45,7 @@ async function load(): Promise<void> {
 	}
 }
 
-void load();
+export const storeLoaded = load();
 
 /**
  * Reactive state persisted to the Tauri store (`ui-state.json`).

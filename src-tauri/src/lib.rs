@@ -45,6 +45,13 @@ fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
         return Err(err.into());
     }
 
+    if let Some(window) = app.get_webview_window("main") {
+        match window.set_background_color(Some(initial_bg_color(app.handle()))) {
+            Ok(()) => debug!("set initial window background color"),
+            Err(err) => warn!("failed to set initial window background color: {err}"),
+        }
+    }
+
     if let Err(err) = app.deep_link().register("ror2mm") {
         warn!("failed to register ror2mm deep link protocol: {:#}", err);
     }
@@ -65,6 +72,9 @@ fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
         let Some(window) = handle.get_webview_window("main") else {
             return;
         };
+
+        // refresh the background color in case the setup-time call was too early
+        let _ = window.set_background_color(Some(initial_bg_color(&handle)));
 
         if let Err(err) = window.show() {
             warn!("failed to show main window: {err}");
@@ -98,6 +108,41 @@ fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+// The webview paints its default background for a frame or two before the
+// first content frame. Match it to the persisted theme early so that frame
+// doesn't flash a foreign color; the frontend refines it to the exact color
+// once the theme state has loaded.
+fn initial_bg_color(app: &AppHandle) -> tauri::window::Color {
+    let dark = app
+        .path()
+        .app_config_dir()
+        .ok()
+        .and_then(|dir| {
+            let path = dir.join("ui-state.json");
+            debug!("reading persisted UI state from {}", path.display());
+            std::fs::read_to_string(path).ok()
+        })
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+        .and_then(|json| {
+            let value = json.get("darkMode")?;
+            value
+                .as_str()
+                .map(str::to_owned)
+                .or_else(|| value.as_bool().map(|b| b.to_string()))
+        })
+        .map(|value| value != "false")
+        .unwrap_or(true);
+
+    debug!(dark, "resolved initial window background");
+
+    if dark {
+        // slate-800, the default primary color's 800 shade
+        tauri::window::Color(30, 41, 59, 255)
+    } else {
+        tauri::window::Color(255, 255, 255, 255)
+    }
+}
+
 fn event_handler(app: &AppHandle, event: RunEvent) {
     if let RunEvent::ExitRequested { api, .. } = event {
         if !app.install_queue().lock().is_processing() {
@@ -126,6 +171,20 @@ fn is_flatpak() -> bool {
     util::flatpak::is_flatpak()
 }
 
+#[tauri::command]
+fn set_window_background_color(
+    red: u8,
+    green: u8,
+    blue: u8,
+    app: AppHandle,
+) -> util::cmd::Result<()> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| eyre::eyre!("main window not found"))?;
+    window.set_background_color(Some(tauri::window::Color(red, green, blue, 255)))?;
+    Ok(())
+}
+
 #[allow(
     clippy::too_many_lines,
     reason = "tauri's generate_handler macro cannot be split"
@@ -144,6 +203,7 @@ pub fn run() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             is_flatpak,
+            set_window_background_color,
             logger::open_gale_log,
             logger::log_err,
             state::is_first_run,
@@ -250,7 +310,19 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_clipboard_manager::init())
-        .plugin(tauri_plugin_window_state::Builder::new().build())
+        // the window is shown manually once the frontend signals readiness.
+        // the plugin must not restore the saved visible state on startup
+        // (restoring e.g. maximized would show the window early), and the
+        // frontend re-applies the saved state right before signaling ready.
+        .plugin(
+            tauri_plugin_window_state::Builder::new()
+                .with_state_flags(
+                    tauri_plugin_window_state::StateFlags::all()
+                        - tauri_plugin_window_state::StateFlags::VISIBLE,
+                )
+                .skip_initial_state("main")
+                .build(),
+        )
         .plugin(tauri_plugin_single_instance::init(handle_single_instance))
         .plugin(tauri_plugin_store::Builder::new().build())
         .setup(setup)

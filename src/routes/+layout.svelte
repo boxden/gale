@@ -15,8 +15,10 @@
 	import profiles from '$lib/state/profile.svelte';
 	import { updateBanner } from '$lib/state/misc.svelte';
 	import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event';
+	import { invoke } from '$lib/invoke';
 	import type { ProfileInfo, ManagedGameInfo } from '$lib/types';
 	import { refreshLanguage } from '$lib/i18n';
+	import { storeLoaded } from '$lib/state/persisted-state.svelte';
 	import MissingProfilesDialog from '$lib/components/dialogs/MissingProfilesDialog.svelte';
 
 	type Props = {
@@ -44,8 +46,37 @@
 			profiles.update(evt.payload);
 		}).then((callback) => (unlistenGames = callback));
 
-		// wait for the first painted frames so the window isn't shown mid-render
-		setTimeout(() => emit('ready'), 100);
+		void storeLoaded.then(async () => {
+			// let pending theme effects (dark class, color shades) flush
+			await new Promise((resolve) =>
+				requestAnimationFrame(() => requestAnimationFrame(resolve))
+			);
+			document.documentElement.classList.remove('theme-loading');
+
+			// restore the saved window geometry once per session; re-applying
+			// it on page reloads (e.g. language switch) would reset the window
+			// while it's visible
+			if (!sessionStorage.getItem('window-state-restored')) {
+				invoke('plugin:window-state|restore_state', { label: 'main' })
+					.then(() => sessionStorage.setItem('window-state-restored', 'true'))
+					.catch(() => {});
+			}
+
+			// match the webview's default background to the app theme so the
+			// first visible frame doesn't flash a foreign color
+			const bg = getComputedStyle(document.querySelector('main')!).backgroundColor;
+			const rgb = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+			if (rgb) {
+				invoke('set_window_background_color', {
+					red: Number(rgb[1]),
+					green: Number(rgb[2]),
+					blue: Number(rgb[3])
+				}).catch(() => {});
+			}
+
+			// wait for the first painted frames so the window isn't shown mid-render
+			setTimeout(() => emit('ready'), 100);
+		});
 
 		return () => {
 			unlistenProfiles?.();
