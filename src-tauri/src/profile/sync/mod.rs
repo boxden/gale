@@ -252,7 +252,9 @@ pub async fn pull_profile(dry_run: bool, app: &AppHandle) -> Result<()> {
         let profile = manager.active_profile_mut();
 
         match &profile.sync {
-            Some(data) if data.missing => bail!("cannot pull from missing profile"),
+            Some(data) if data.missing => {
+                bail!("cannot pull from missing profile");
+            }
             Some(data) => (
                 data.id.clone(),
                 profile.id,

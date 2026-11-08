@@ -27,7 +27,7 @@ pub fn create_launch_command(
 #[allow(unused_variables)] // allow unused game_dir on windows
 fn create_steam_command(game_dir: &Path, game: Game, prefs: &Prefs) -> Result<Command> {
     let Some(steam) = &game.platforms.steam else {
-        bail!("{} is not available on Steam", game.name)
+        bail!("{} is not available on Steam", game.name);
     };
 
     let mut command = create_base_steam_command()?;
@@ -216,7 +216,7 @@ fn get_steam_app_info(app_id: u32) -> Result<serde_json::Value> {
 
 fn create_epic_command(game: Game) -> Result<Command> {
     let Some(epic) = &game.platforms.epic_games else {
-        bail!("{} is not available on Epic Games", game.name)
+        bail!("{} is not available on Epic Games", game.name);
     };
 
     let url = format!(
@@ -239,7 +239,9 @@ pub fn locate_game_dir(platform: Option<Platform>, game: Game) -> Result<PathBuf
         Some(Platform::XboxStore) => xbox_game_dir(game),
         #[cfg(windows)]
         Some(Platform::EpicGames) => epic_game_dir(game),
-        _ => bail!("game directory not found - you may need to specify it in the settings"),
+        _ => {
+            bail!("game directory not found - you may need to specify it in the settings");
+        }
     }
 }
 
@@ -263,7 +265,7 @@ fn xbox_game_dir(game: Game) -> Result<PathBuf> {
     use eyre::{Context, ensure};
 
     let Some(xbox) = &game.platforms.xbox_store else {
-        bail!("{} is not available on Xbox Store", game.name)
+        bail!("{} is not available on Xbox Store", game.name);
     };
 
     let name = xbox.identifier.unwrap_or(game.name);
@@ -301,7 +303,7 @@ fn epic_game_dir(game: Game) -> Result<PathBuf, eyre::Error> {
     use crate::util;
 
     let Some(epic) = &game.platforms.epic_games else {
-        bail!("{} is not available on Epic Games", game.name)
+        bail!("{} is not available on Epic Games", game.name);
     };
 
     let name = epic.identifier.unwrap_or(game.name);

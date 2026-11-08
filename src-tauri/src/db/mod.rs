@@ -75,9 +75,11 @@ fn run_migrations(conn: &mut rusqlite::Connection) -> Result<()> {
             0usize
         }
         SchemaVersion::Inside(version) => version.into(),
-        SchemaVersion::Outside(_) => bail!(
-            "database has been modified by a newer version of Gale, please update to the latest version"
-        ),
+        SchemaVersion::Outside(_) => {
+            bail!(
+                "database has been modified by a newer version of Gale, please update to the latest version"
+            );
+        }
     };
 
     if latest_version == current_version {
