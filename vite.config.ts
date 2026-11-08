@@ -4,6 +4,11 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+	server: {
+		watch: {
+			ignored: ['**/src-tauri/target/**']
+		}
+	},
 	plugins: [
 		paraglideVitePlugin({
 			project: './project.inlang',
