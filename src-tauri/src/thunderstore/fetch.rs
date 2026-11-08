@@ -6,9 +6,9 @@ use std::{
 };
 
 use bytes::Bytes;
-use eyre::{Context, Report, Result};
+use eyre::{Report, Result};
 use flate2::read::GzDecoder;
-use futures_util::{TryFutureExt, future};
+use futures_util::{StreamExt, TryFutureExt, future, stream};
 use indexmap::IndexMap;
 use serde::Serialize;
 use tauri::AppHandle;
@@ -286,11 +286,22 @@ async fn fetch_single_packages(
         urls: Vec<String>,
         app: AppHandle,
     ) -> Result<()> {
-        for url in urls {
-            let bytes = app.http().get(url).send().await?.bytes().await?;
-            tx.send(bytes)
-                .await
-                .context("chunk channel closed too early")?;
+        let mut chunks = stream::iter(urls)
+            .map(|url| {
+                let app = app.clone();
+                async move {
+                    let bytes = app.http().get(url).send().await?.bytes().await?;
+                    Ok::<_, eyre::Report>(bytes)
+                }
+            })
+            .buffer_unordered(4);
+
+        while let Some(chunk) = chunks.next().await {
+            let bytes = chunk?;
+            if tx.send(bytes).await.is_err() {
+                debug!("chunk channel closed early, stopping package fetch");
+                break;
+            }
         }
 
         Ok(())
