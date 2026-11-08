@@ -44,7 +44,8 @@
 			profiles.update(evt.payload);
 		}).then((callback) => (unlistenGames = callback));
 
-		emit('ready');
+		// wait for the first painted frames so the window isn't shown mid-render
+		setTimeout(() => emit('ready'), 100);
 
 		return () => {
 			unlistenProfiles?.();

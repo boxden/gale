@@ -2,7 +2,7 @@ use std::env;
 
 use itertools::Itertools;
 use state::ManagerExt;
-use tauri::{App, AppHandle, RunEvent};
+use tauri::{App, AppHandle, Listener, Manager, RunEvent};
 use tauri_plugin_deep_link::DeepLinkExt;
 use tracing::{debug, error, info, warn};
 
@@ -59,6 +59,32 @@ fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     {
         cli::run(args, app.handle());
     }
+
+    let handle = app.handle().clone();
+    app.listen("ready", move |_| {
+        let Some(window) = handle.get_webview_window("main") else {
+            return;
+        };
+
+        if let Err(err) = window.show() {
+            warn!("failed to show main window: {err}");
+        }
+
+        let _ = window.set_focus();
+    });
+
+    // fallback in case the frontend never manages to signal readiness
+    let fallback_handle = app.handle().clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(15)).await;
+
+        if let Some(window) = fallback_handle.get_webview_window("main")
+            && matches!(window.is_visible(), Ok(false))
+        {
+            warn!("frontend did not become ready in time, showing window anyway");
+            let _ = window.show();
+        }
+    });
 
     let handle = app.handle().to_owned();
     tauri::async_runtime::spawn(async move {

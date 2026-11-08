@@ -69,6 +69,7 @@
 				"decorations": true,
 				"fullscreen": false,
 				"transparent": false,
+				"visible": false,
 				"resizable": true,
 				"title": "Gale",
 				"width": 900,
