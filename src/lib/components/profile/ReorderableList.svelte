@@ -55,7 +55,7 @@
 		})
 	]}
 >
-	<VirtualList {items} rowId={(item) => itemId(item)} itemHeight={58}>
+	<VirtualList {items} rowId={(item) => itemId(item)}>
 		{#snippet children({ item, index })}
 			{@const hovered = item === hovering}
 

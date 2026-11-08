@@ -42,7 +42,7 @@
 </script>
 
 {#if items.length > 0}
-	<Content forceMount>
+	<Content>
 		{#snippet child({ wrapperProps, props, open })}
 			<div {...wrapperProps}>
 				{#if open}

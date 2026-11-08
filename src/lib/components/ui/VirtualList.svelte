@@ -3,7 +3,7 @@
 
 	// (c) 2018 Rich Harris
 	// https://github.com/sveltejs/svelte-virtual-list/blob/master/LICENSE
-	import { onMount, tick, type Snippet } from 'svelte';
+	import { onDestroy, onMount, tick, type Snippet } from 'svelte';
 
 	type Props = {
 		// props
@@ -28,14 +28,18 @@
 	}: Props = $props();
 
 	// local state
+	const OVERSCAN = 3;
+
 	let heightMap: number[] = [];
 	let rows: HTMLCollectionOf<HTMLElement>;
 	let viewport: HTMLElement;
 	let contents: HTMLElement;
 	let viewportHeight = $state(0);
+	let renderStart = $derived(Math.max(0, start - OVERSCAN));
+	let renderEnd = $derived(Math.min(items.length, end + OVERSCAN));
 	let visible: { index: number; data: T }[] = $derived(
-		items.slice(start, end).map((data, i) => {
-			return { index: i + start, data };
+		items.slice(renderStart, renderEnd).map((data, i) => {
+			return { index: i + renderStart, data };
 		})
 	);
 	let mounted: boolean = $state(false);
@@ -44,6 +48,18 @@
 	let bottom = $state(0);
 	let average_height: number;
 
+	let padTop = $derived.by(() => {
+		let pad = top;
+		for (let i = renderStart; i < start; i++) pad -= heightMap[i] || average_height || 0;
+		return Math.max(0, pad);
+	});
+
+	let padBottom = $derived.by(() => {
+		let pad = bottom;
+		for (let i = end; i < renderEnd; i++) pad -= heightMap[i] || average_height || 0;
+		return Math.max(0, pad);
+	});
+
 	async function refresh(items: T[], viewportHeight: number, itemHeight: number | undefined) {
 		const { scrollTop } = viewport;
 
@@ -51,14 +67,15 @@
 
 		let contentHeight = top - scrollTop;
 		let i = start;
+		const rs = Math.max(0, start - OVERSCAN);
 
 		while (contentHeight < viewportHeight && i < items.length) {
-			let row = rows[i - start];
+			let row = rows[i - rs];
 
 			if (!row) {
 				end = i + 1;
 				await tick(); // render the newly visible row
-				row = rows[i - start];
+				row = rows[i - rs];
 			}
 
 			const rowHeight = (heightMap[i] = itemHeight ?? row.offsetHeight);
@@ -69,19 +86,30 @@
 		end = i;
 
 		const remaining = items.length - end;
-		average_height = (top + contentHeight) / end;
+		average_height = end > 0 ? (top + contentHeight) / end : 0;
 
 		bottom = remaining * average_height;
 		heightMap.length = items.length;
+	}
+
+	let scrollRaf = 0;
+
+	function onScrollRequest() {
+		if (scrollRaf !== 0) return;
+		scrollRaf = requestAnimationFrame(() => {
+			scrollRaf = 0;
+			handleScroll();
+		});
 	}
 
 	async function handleScroll() {
 		const { scrollTop } = viewport;
 
 		const old_start = start;
+		const rs = Math.max(0, start - OVERSCAN);
 
 		for (let v = 0; v < rows.length; v += 1) {
-			heightMap[start + v] = itemHeight || rows[v].offsetHeight;
+			heightMap[rs + v] = itemHeight || rows[v].offsetHeight;
 		}
 
 		let i = 0;
@@ -110,7 +138,7 @@
 		end = i;
 
 		const remaining = items.length - end;
-		average_height = y / end;
+		average_height = end > 0 ? y / end : 0;
 
 		while (i < items.length) heightMap[i++] = average_height;
 		bottom = remaining * average_height;
@@ -119,13 +147,14 @@
 		if (start < old_start) {
 			await tick();
 
+			const rsOld = Math.max(0, old_start - OVERSCAN);
 			let expected_height = 0;
 			let actual_height = 0;
 
 			for (let i = start; i < old_start; i += 1) {
-				if (rows[i - start]) {
+				if (rows[i - rsOld]) {
 					expected_height += heightMap[i];
-					actual_height += itemHeight || rows[i - start].offsetHeight;
+					actual_height += itemHeight || rows[i - rsOld].offsetHeight;
 				}
 			}
 
@@ -152,6 +181,10 @@
 		mounted = true;
 	});
 
+	onDestroy(() => {
+		if (scrollRaf !== 0) cancelAnimationFrame(scrollRaf);
+	});
+
 	// whenever `items` changes, invalidate the current heightmap
 	run(() => {
 		if (mounted) refresh(items, viewportHeight, itemHeight);
@@ -161,12 +194,12 @@
 <svelte-virtual-list-viewport
 	bind:this={viewport}
 	bind:offsetHeight={viewportHeight}
-	onscroll={handleScroll}
+	onscroll={onScrollRequest}
 	style="height: {height};"
 >
 	<svelte-virtual-list-contents
 		bind:this={contents}
-		style="padding-top: {top}px; padding-bottom: {bottom}px;"
+		style="padding-top: {padTop}px; padding-bottom: {padBottom}px;"
 	>
 		{#each visible as row (rowId?.(row.data) ?? row.index)}
 			<svelte-virtual-list-row>
