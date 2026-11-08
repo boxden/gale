@@ -234,238 +234,243 @@
 	});
 </script>
 
-<div class="relative mx-auto flex w-full max-w-4xl flex-col gap-1.5 overflow-y-auto px-6 py-4">
-	{#if loading}
-		<div
-			class="text-primary-700 dark:text-primary-200 absolute inset-0 flex items-center justify-center gap-2 text-lg"
-		>
-			<Spinner />
-			{loading}
-		</div>
-	{:else}
-		<FormField
-			label={m.modpack_name_title()}
-			description={m.modpack_name_description({ backend })}
-			required={true}
-		>
-			<InputField
-				onchange={saveArgs}
-				bind:value={name}
-				placeholder={m.modpack_name_placeholder()}
-				required={true}
-				pattern="^[a-zA-Z0-9_]+$"
-				class="w-full"
-			/>
-		</FormField>
-
-		<FormField
-			label={m.modpack_author_title()}
-			description={m.modpack_author_description({ backend })}
-			required
-		>
-			<InputField
-				onchange={saveArgs}
-				bind:value={author}
-				placeholder={m.modpack_author_placeholder()}
-				class="w-full"
-				required
-			/>
-		</FormField>
-
-		<FormField
-			label={m.modpack_description_title()}
-			description={m.modpack_description_description()}
-			required
-		>
-			<InputField
-				onchange={saveArgs}
-				bind:value={description}
-				placeholder={m.modpack_description_placeholder()}
-				maxlength={250}
-				class="w-full"
-				required
-			/>
-		</FormField>
-
-		<FormField
-			label={m.modpack_categories_title()}
-			description={m.modpack_categories_description()}
-		>
-			<Select
-				items={games.categories.map((category) => ({
-					label: category.name,
-					value: category.slug
-				}))}
-				bind:value={selectedCategories}
-				onValueChange={saveArgs}
-				type="multiple"
-				triggerClass="w-full"
+<div class="relative w-full overflow-y-auto">
+	<div class="mx-auto flex w-full max-w-4xl flex-col gap-1.5 px-6 py-4">
+		{#if loading}
+			<div
+				class="text-primary-700 dark:text-primary-200 absolute inset-0 flex items-center justify-center gap-2 text-lg"
 			>
-				{#snippet label()}
-					{#if selectedCategories.length === 0}
-						<span class="text-primary-500 dark:text-primary-400 truncate pl-2"
-							>{m.modpack_categories_content()}</span
-						>
-					{:else}
-						<div class="flex flex-wrap gap-1">
-							{#each selectedCategories as category}
-								<div
-									class="text-primary-700 dark:bg-primary-800 dark:text-primary-200 bg-primary-200 rounded-md py-1 pr-1 pl-3 text-sm"
-								>
-									<span class="truncate overflow-hidden">{toHeaderCase(category)}</span>
-
-									<button
-										class="dark:hover:bg-primary-700 hover:bg-primary-300 ml-1 rounded-md px-1.5"
-										onclick={(evt) => {
-											evt.stopPropagation();
-											selectedCategories = selectedCategories.filter((cat) => cat !== category);
-										}}
-									>
-										x
-									</button>
-								</div>
-							{/each}
-						</div>
-					{/if}
-				{/snippet}
-			</Select>
-		</FormField>
-
-		<FormField
-			label={m.modpack_version_title()}
-			description={m.modpack_version_description()}
-			required
-		>
-			<InputField
-				onchange={saveArgs}
-				bind:value={versionNumber}
-				placeholder={m.modpack_version_placeholder()}
+				<Spinner />
+				{loading}
+			</div>
+		{:else}
+			<FormField
+				label={m.modpack_name_title()}
+				description={m.modpack_name_description({ backend })}
 				required={true}
-				pattern="^\d+\.\d+\.\d+$"
-				class="w-full"
-			/>
-		</FormField>
+			>
+				<InputField
+					onchange={saveArgs}
+					bind:value={name}
+					placeholder={m.modpack_name_placeholder()}
+					required={true}
+					pattern="^[a-zA-Z0-9_]+$"
+					class="w-full"
+				/>
+			</FormField>
 
-		<FormField label={m.modpack_website_title()} description={m.modpack_website_description()}>
-			<InputField
-				onchange={saveArgs}
-				bind:value={websiteUrl}
-				placeholder={m.modpack_website_placeholder()}
-				pattern={URL_PATTERN}
-				class="w-full"
-			/>
-		</FormField>
+			<FormField
+				label={m.modpack_author_title()}
+				description={m.modpack_author_description({ backend })}
+				required
+			>
+				<InputField
+					onchange={saveArgs}
+					bind:value={author}
+					placeholder={m.modpack_author_placeholder()}
+					class="w-full"
+					required
+				/>
+			</FormField>
 
-		<FormField label={m.modpack_icon_title()} description={m.modpack_icon_description()} required>
-			<PathField icon="mdi:file-image" onclick={browseIcon} value={iconPath} />
-		</FormField>
+			<FormField
+				label={m.modpack_description_title()}
+				description={m.modpack_description_description()}
+				required
+			>
+				<InputField
+					onchange={saveArgs}
+					bind:value={description}
+					placeholder={m.modpack_description_placeholder()}
+					maxlength={250}
+					class="w-full"
+					required
+				/>
+			</FormField>
 
-		<FormField
-			label={m.modpack_readme_title()}
-			description={m.modpack_readme_description()}
-			required
-		>
-			<ResizableInputField
-				onchange={saveArgs}
-				bind:value={readme}
-				placeholder={m.modpack_readme_placeholder()}
-				mono={true}
-			/>
-
-			<details class="mt-1">
-				<summary class="text-primary-600 dark:text-primary-300 cursor-pointer text-sm">
-					{m.modpack_readme_preview()}
-				</summary>
-				<Markdown class="mt-1 px-4" source={readme} />
-				<div class="dark:bg-primary-500 bg-primary-300 mt-4 h-0.5"></div>
-			</details>
-		</FormField>
-
-		<FormField label={m.modpack_changeLog_title()} description={m.modpack_changeLog_description()}>
-			<ResizableInputField
-				onchange={saveArgs}
-				bind:value={changelog}
-				placeholder={m.modpack_changeLog_placeholder()}
-				mono={true}
-			/>
-
-			<Button color="primary" onclick={() => generateChangelog(false)}>
-				{m.modpack_changeLog_button_single({ versionNumber })}
-			</Button>
-			<Button color="primary" onclick={() => generateChangelog(true)}>
-				{m.modpack_changeLog_button_all()}
-			</Button>
-
-			<details class="mt-1">
-				<summary class="text-primary-600 dark:text-primary-300 cursor-pointer text-sm"
-					>{m.modpack_changeLog_preview()}</summary
+			<FormField
+				label={m.modpack_categories_title()}
+				description={m.modpack_categories_description()}
+			>
+				<Select
+					items={games.categories.map((category) => ({
+						label: category.name,
+						value: category.slug
+					}))}
+					bind:value={selectedCategories}
+					onValueChange={saveArgs}
+					type="multiple"
+					triggerClass="w-full"
 				>
-				<Markdown class="mt-1 px-4" source={changelog} />
-				<div class="dark:bg-primary-500 bg-primary-300 mt-4 h-0.5"></div>
-			</details>
-		</FormField>
+					{#snippet label()}
+						{#if selectedCategories.length === 0}
+							<span class="text-primary-500 dark:text-primary-400 truncate pl-2"
+								>{m.modpack_categories_content()}</span
+							>
+						{:else}
+							<div class="flex flex-wrap gap-1">
+								{#each selectedCategories as category}
+									<div
+										class="text-primary-700 dark:bg-primary-800 dark:text-primary-200 bg-primary-200 rounded-md py-1 pr-1 pl-3 text-sm"
+									>
+										<span class="truncate overflow-hidden">{toHeaderCase(category)}</span>
 
-		<FormField
-			label={m.modpack_includeFiles_title({ count: includedFileCount, size: includeFiles?.size })}
-			description={m.modpack_includeFiles_description()}
-		>
-			<InputField
-				bind:value={includedFilesSearch}
-				class="mt-2 w-full"
-				placeholder={m.modpack_includeFiles_placeholder()}
-			/>
+										<button
+											class="dark:hover:bg-primary-700 hover:bg-primary-300 ml-1 rounded-md px-1.5"
+											onclick={(evt) => {
+												evt.stopPropagation();
+												selectedCategories = selectedCategories.filter((cat) => cat !== category);
+											}}
+										>
+											x
+										</button>
+									</div>
+								{/each}
+							</div>
+						{/if}
+					{/snippet}
+				</Select>
+			</FormField>
 
-			<FileTree
-				class="mt-2"
-				title={m.modpack_includeFiles_list_title()}
-				items={shownFileIncludes}
-				maxHeight="md"
-				getPath={(item) => item}
-				get={(item) => includeFiles.get(item) ?? false}
-				set={(item, value) => {
-					includeFiles.set(item, value);
-					includeFiles = includeFiles;
-				}}
-				setMany={(paths, value) => {
-					for (const path of paths) includeFiles.set(path, value);
-					includeFiles = includeFiles;
-				}}
-			/>
-		</FormField>
+			<FormField
+				label={m.modpack_version_title()}
+				description={m.modpack_version_description()}
+				required
+			>
+				<InputField
+					onchange={saveArgs}
+					bind:value={versionNumber}
+					placeholder={m.modpack_version_placeholder()}
+					required={true}
+					pattern="^\d+\.\d+\.\d+$"
+					class="w-full"
+				/>
+			</FormField>
 
-		<div class="text-primary-700 dark:text-primary-200 mt-1 flex items-center">
-			<span class="max-w-96 grow">{m.modpack_NSFW_title()}</span>
+			<FormField label={m.modpack_website_title()} description={m.modpack_website_description()}>
+				<InputField
+					onchange={saveArgs}
+					bind:value={websiteUrl}
+					placeholder={m.modpack_website_placeholder()}
+					pattern={URL_PATTERN}
+					class="w-full"
+				/>
+			</FormField>
 
-			<Checkbox onCheckedChange={saveArgs} bind:checked={nsfw} />
-		</div>
+			<FormField label={m.modpack_icon_title()} description={m.modpack_icon_description()} required>
+				<PathField icon="mdi:file-image" onclick={browseIcon} value={iconPath} />
+			</FormField>
 
-		<div class="text-primary-700 dark:text-primary-200 flex items-center">
-			<span class="max-w-96 grow">{m.modpack_disabled_title()}</span>
+			<FormField
+				label={m.modpack_readme_title()}
+				description={m.modpack_readme_description()}
+				required
+			>
+				<ResizableInputField
+					onchange={saveArgs}
+					bind:value={readme}
+					placeholder={m.modpack_readme_placeholder()}
+					mono={true}
+				/>
 
-			<Checkbox onCheckedChange={saveArgs} bind:checked={includeDisabled} />
-		</div>
+				<details class="mt-1">
+					<summary class="text-primary-600 dark:text-primary-300 cursor-pointer text-sm">
+						{m.modpack_readme_preview()}
+					</summary>
+					<Markdown class="mt-1 px-4" source={readme} />
+					<div class="dark:bg-primary-500 bg-primary-300 mt-4 h-0.5"></div>
+				</details>
+			</FormField>
 
-		{#if games.activeBackends.length > 1}
+			<FormField
+				label={m.modpack_changeLog_title()}
+				description={m.modpack_changeLog_description()}
+			>
+				<ResizableInputField
+					onchange={saveArgs}
+					bind:value={changelog}
+					placeholder={m.modpack_changeLog_placeholder()}
+					mono={true}
+				/>
+
+				<Button color="primary" onclick={() => generateChangelog(false)}>
+					{m.modpack_changeLog_button_single({ versionNumber })}
+				</Button>
+				<Button color="primary" onclick={() => generateChangelog(true)}>
+					{m.modpack_changeLog_button_all()}
+				</Button>
+
+				<details class="mt-1">
+					<summary class="text-primary-600 dark:text-primary-300 cursor-pointer text-sm"
+						>{m.modpack_changeLog_preview()}</summary
+					>
+					<Markdown class="mt-1 px-4" source={changelog} />
+					<div class="dark:bg-primary-500 bg-primary-300 mt-4 h-0.5"></div>
+				</details>
+			</FormField>
+
+			<FormField
+				label={m.modpack_includeFiles_title({ count: includedFileCount, size: includeFiles?.size })}
+				description={m.modpack_includeFiles_description()}
+			>
+				<InputField
+					bind:value={includedFilesSearch}
+					class="mt-2 w-full"
+					placeholder={m.modpack_includeFiles_placeholder()}
+				/>
+
+				<FileTree
+					class="mt-2"
+					title={m.modpack_includeFiles_list_title()}
+					items={shownFileIncludes}
+					maxHeight="md"
+					getPath={(item) => item}
+					get={(item) => includeFiles.get(item) ?? false}
+					set={(item, value) => {
+						includeFiles.set(item, value);
+						includeFiles = includeFiles;
+					}}
+					setMany={(paths, value) => {
+						for (const path of paths) includeFiles.set(path, value);
+						includeFiles = includeFiles;
+					}}
+				/>
+			</FormField>
+
+			<div class="text-primary-700 dark:text-primary-200 mt-1 flex items-center">
+				<span class="max-w-96 grow">{m.modpack_NSFW_title()}</span>
+
+				<Checkbox onCheckedChange={saveArgs} bind:checked={nsfw} />
+			</div>
+
 			<div class="text-primary-700 dark:text-primary-200 flex items-center">
-				<span class="max-w-96 grow">{m.modpack_upload_server()}</span>
+				<span class="max-w-96 grow">{m.modpack_disabled_title()}</span>
 
-				{#if hexiumExclusive}
-					<Info>{m.modpack_upload_serverHexiumExclusive()}</Info>
-				{/if}
+				<Checkbox onCheckedChange={saveArgs} bind:checked={includeDisabled} />
+			</div>
 
-				<Select type="single" triggerClass="grow" items={backendItems} bind:value={backend} />
+			{#if games.activeBackends.length > 1}
+				<div class="text-primary-700 dark:text-primary-200 flex items-center">
+					<span class="max-w-96 grow">{m.modpack_upload_server()}</span>
+
+					{#if hexiumExclusive}
+						<Info>{m.modpack_upload_serverHexiumExclusive()}</Info>
+					{/if}
+
+					<Select type="single" triggerClass="grow" items={backendItems} bind:value={backend} />
+				</div>
+			{/if}
+
+			<div class="mt-3 flex justify-end gap-2">
+				<Button color="primary" icon="mdi:export" onclick={exportToFile}>
+					{m.modpack_button_export()}
+				</Button>
+				<Button color="accent" icon="mdi:upload" onclick={uploadToThunderstore}>
+					{m.modpack_button_publish({ backend })}
+				</Button>
 			</div>
 		{/if}
-
-		<div class="mt-3 flex justify-end gap-2">
-			<Button color="primary" icon="mdi:export" onclick={exportToFile}>
-				{m.modpack_button_export()}
-			</Button>
-			<Button color="accent" icon="mdi:upload" onclick={uploadToThunderstore}>
-				{m.modpack_button_publish({ backend })}
-			</Button>
-		</div>
-	{/if}
+	</div>
 </div>
 
 <ApiKeyDialog />
