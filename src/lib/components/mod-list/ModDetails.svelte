@@ -4,6 +4,7 @@
 
 	import ModInfoDialog from '../dialogs/ModInfoDialog.svelte';
 	import ModCardList from '../ui/ModCardList.svelte';
+	import { rememberScroll } from '$lib/scrollMemory';
 
 	import { type ContextItem, type Mod, ModType } from '$lib/types';
 	import {
@@ -100,7 +101,7 @@
 		<ContextMenuContent items={allContextItems} type="dropdown" />
 	</DropdownMenu.Root>
 
-	<div class="-mr-3 grow overflow-x-hidden overflow-y-scroll pr-3 pb-2">
+	<div class="-mr-3 grow overflow-x-hidden overflow-y-scroll pr-3 pb-2" use:rememberScroll>
 		<div class="mb-3 flex flex-col gap-4 xl:flex-row xl:items-center">
 			<img src={modIconSrc(mod)} class="max-h-30 max-w-30 rounded-lg" alt="" />
 

@@ -15,6 +15,7 @@
 
 	import Dialog from '$lib/components/ui/Dialog.svelte';
 	import FileTree from '$lib/components/ui/FileTree.svelte';
+	import { rememberScroll } from '$lib/scrollMemory';
 	import ResizableInputField from '$lib/components/ui/ResizableInputField.svelte';
 	import { toHeaderCase } from 'js-convert-case';
 	import Spinner from '$lib/components/ui/Spinner.svelte';
@@ -234,7 +235,7 @@
 	});
 </script>
 
-<div class="relative w-full overflow-y-auto">
+<div class="relative w-full overflow-y-auto" use:rememberScroll={'modpack'}>
 	<div class="mx-auto flex w-full max-w-4xl flex-col gap-1.5 px-6 py-4">
 		{#if loading}
 			<div
@@ -371,6 +372,7 @@
 					bind:value={readme}
 					placeholder={m.modpack_readme_placeholder()}
 					mono={true}
+					scrollKey="modpack-readme"
 				/>
 
 				<details class="mt-1">
@@ -391,6 +393,7 @@
 					bind:value={changelog}
 					placeholder={m.modpack_changeLog_placeholder()}
 					mono={true}
+					scrollKey="modpack-changelog"
 				/>
 
 				<Button color="primary" onclick={() => generateChangelog(false)}>

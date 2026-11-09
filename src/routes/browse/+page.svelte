@@ -1,12 +1,18 @@
+<script module lang="ts">
+	import type { BrowsedMod } from '$lib/types';
+
+	// result set cached at module level: client-side navigation remounts
+	// this page, and starting from an empty array meant the list stayed
+	// blank for the whole duration of the (potentially large) query.
+	// Rendering the previous results instantly lets the scroll restore
+	// fire immediately while refresh() updates the data in the background.
+	let cachedMods: BrowsedMod[] = [];
+	let cachedGame: string | null = null;
+</script>
+
 <script lang="ts">
 	import * as api from '$lib/api';
-	import {
-		type SortBy,
-		type Mod,
-		type ModId,
-		type ModContextItem,
-		type BrowsedMod
-	} from '$lib/types';
+	import { type SortBy, type Mod, type ModId, type ModContextItem } from '$lib/types';
 
 	import ModList from '$lib/components/mod-list/ModList.svelte';
 
@@ -15,10 +21,12 @@
 	import ModListItem from '$lib/components/mod-list/ModListItem.svelte';
 	import ProfileLockedBanner from '$lib/components/mod-list/ProfileLockedBanner.svelte';
 	import ModListFilters from '$lib/components/mod-list/ModListFilters.svelte';
-	import { getDefaultContextItems } from '$lib/context';
 	import InstallModButton from '$lib/components/mod-list/InstallModButton.svelte';
+	import { getDefaultContextItems } from '$lib/context';
 	import profiles from '$lib/state/profile.svelte';
 	import { modQuery } from '$lib/state/misc.svelte';
+	import games from '$lib/state/game.svelte';
+	import { scrollAnchors } from '$lib/scrollMemory';
 	import { m } from '$lib/paraglide/messages';
 	import { pushInfoToast } from '$lib/toast';
 	import HelpCard from '$lib/components/ui/HelpCard.svelte';
@@ -46,18 +54,41 @@
 		...getDefaultContextItems()
 	]);
 
-	let mods: BrowsedMod[] = $state([]);
+	const initialGame = untrack(() => games.active?.slug ?? null);
+	const scrollKey = $derived(`browse-mods:${games.active?.slug ?? 'none'}`);
 
-	let maxCount: number = $state(20);
+	let mods: BrowsedMod[] = $state(cachedGame === initialGame ? cachedMods : []);
+	// prefetch enough mods for the remembered anchor index to exist
+	let maxCount: number = $state(maxInitialCount(initialGame));
+	let lastGame = initialGame;
+
+	function maxInitialCount(game: string | null) {
+		return Math.max(20, (scrollAnchors.get(`browse-mods:${game ?? 'none'}`)?.index ?? 0) + 80);
+	}
+
+	$effect.pre(() => {
+		const game = games.active?.slug ?? null;
+		if (game === lastGame) return;
+		lastGame = game;
+		mods = cachedGame === game ? cachedMods : [];
+		maxCount = maxInitialCount(game);
+	});
+
 	let selectedMod: BrowsedMod | null = $state(null);
 	let foreignDownloadDialogOpen = $state(false);
 
 	let installId: ModId;
 	let unlistenFromQuery: UnlistenFn | undefined;
 
+	function cacheMods(newMods: BrowsedMod[]) {
+		mods = newMods;
+		cachedMods = newMods;
+		cachedGame = games.active?.slug ?? null;
+	}
+
 	onMount(() => {
 		listen<BrowsedMod[]>('mod_query_result', (evt) => {
-			mods = evt.payload;
+			cacheMods(evt.payload);
 		}).then((unlisten) => {
 			unlistenFromQuery = unlisten;
 		});
@@ -83,7 +114,7 @@
 		if (refreshing) return;
 		refreshing = true;
 
-		mods = await api.thunderstore.query({ ...modQuery.current, maxCount });
+		cacheMods(await api.thunderstore.query({ ...modQuery.current, maxCount }));
 		if (selectedMod) {
 			// isInstalled might have changed
 			selectedMod = findItemByUuid(itemUuid(selectedMod));
@@ -149,32 +180,42 @@
 			<ProfileLockedBanner class="mb-1" />
 		{/if}
 
-		<ModList {mods} queryArgs={modQuery.current} bind:maxCount>
-			{#snippet placeholder()}
-				{#if hasRefreshed}
-					<HelpCard title={m.browse_modList_content_1()} icon="mdi:store-search" class="mt-4">
-						{m.browse_modList_content_2()}
-					</HelpCard>
-				{/if}
-			{/snippet}
+		{#key games.active?.slug}
+			<ModList
+				{mods}
+				queryArgs={modQuery.current}
+				bind:maxCount
+				{scrollKey}
+				rowId={(mod) =>
+					itemUuid(mod) ??
+					`${mod.data.thunderstore ? 'ts' : 'hx'}:${mod.data.thunderstore?.name ?? mod.data.hexium?.name ?? ''}`}
+			>
+				{#snippet placeholder()}
+					{#if hasRefreshed}
+						<HelpCard title={m.browse_modList_content_1()} icon="mdi:store-search" class="mt-4">
+							{m.browse_modList_content_2()}
+						</HelpCard>
+					{/if}
+				{/snippet}
 
-			{#snippet item({ mod })}
-				{@const shownMod = extractDeduplicatedMod(mod.data, getPreferredBackend(mod.data))!}
-				{@const combinedDownloads =
-					(mod.data.hexium?.downloads ?? 0) + (mod.data.thunderstore?.downloads ?? 0)}
+				{#snippet item({ mod })}
+					{@const shownMod = extractDeduplicatedMod(mod.data, getPreferredBackend(mod.data))!}
+					{@const combinedDownloads =
+						(mod.data.hexium?.downloads ?? 0) + (mod.data.thunderstore?.downloads ?? 0)}
 
-				<ModListItem
-					{contextItems}
-					{combinedDownloads}
-					mod={shownMod}
-					isInstalled={mod.isInstalled}
-					selected={selectedMod !== null && itemUuid(selectedMod) === shownMod.uuid}
-					{locked}
-					oninstall={() => installLatest(shownMod)}
-					onclick={(evt) => onModClicked(evt, shownMod, mod.isInstalled)}
-				/>
-			{/snippet}
-		</ModList>
+					<ModListItem
+						{contextItems}
+						{combinedDownloads}
+						mod={shownMod}
+						isInstalled={mod.isInstalled}
+						selected={selectedMod !== null && itemUuid(selectedMod) === shownMod.uuid}
+						{locked}
+						oninstall={() => installLatest(shownMod)}
+						onclick={(evt) => onModClicked(evt, shownMod, mod.isInstalled)}
+					/>
+				{/snippet}
+			</ModList>
+		{/key}
 	</div>
 
 	{#if selectedMod}

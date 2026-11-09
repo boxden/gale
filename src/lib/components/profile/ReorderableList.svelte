@@ -13,9 +13,10 @@
 		mod: Snippet<[{ mod: ProfileMod; index: number }]>;
 		onmove?: (item: ListItem, fromIndex: number, toIndex: number) => void;
 		reorderable?: boolean;
+		scrollKey?: string;
 	};
 
-	let { items = $bindable(), mod, onmove, reorderable = true }: Props = $props();
+	let { items = $bindable(), mod, onmove, reorderable = true, scrollKey }: Props = $props();
 
 	let hovering: ListItem | null = $state(null);
 
@@ -55,7 +56,7 @@
 		})
 	]}
 >
-	<VirtualList {items} rowId={(item) => itemId(item)}>
+	<VirtualList {items} {scrollKey} rowId={(item) => itemId(item)}>
 		{#snippet children({ item, index })}
 			{@const hovered = item === hovering}
 

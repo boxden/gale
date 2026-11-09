@@ -1,5 +1,6 @@
 <script lang="ts" generics="T">
 	import VirtualList from '$lib/components/ui/VirtualList.svelte';
+	import { storeLoaded } from '$lib/state/persisted-state.svelte';
 	import type { Mod, QueryModsArgsWithoutMax } from '$lib/types';
 	import type { Snippet } from 'svelte';
 
@@ -10,9 +11,18 @@
 		placeholder?: Snippet;
 		item: Snippet<[{ mod: T; index: number }]>;
 		rowId?: (mod: T) => string;
+		scrollKey?: string;
 	};
 
-	let { mods, maxCount = $bindable(20), queryArgs, placeholder, item, rowId }: Props = $props();
+	let {
+		mods,
+		maxCount = $bindable(20),
+		queryArgs,
+		placeholder,
+		item,
+		rowId,
+		scrollKey
+	}: Props = $props();
 
 	let listStart = $state(0);
 	let listEnd = $state(0);
@@ -24,9 +34,19 @@
 		}
 	});
 
+	// queryArgs swaps from defaults to the persisted value once the store
+	// hydrates; that isn't a user-initiated query change and must not reset
+	// a restored scroll position
+	let storeHydrated = $state(false);
+	void storeLoaded.then(() => (storeHydrated = true));
+
+	let lastQueryArgs: string | undefined;
 	$effect(() => {
-		JSON.stringify(queryArgs);
-		virtualList?.scrollTo(0);
+		const q = JSON.stringify(queryArgs);
+		if (storeHydrated && lastQueryArgs !== undefined && lastQueryArgs !== q) {
+			virtualList?.scrollTo(0);
+		}
+		lastQueryArgs = q;
 	});
 </script>
 
@@ -37,6 +57,7 @@
 {:else}
 	<VirtualList
 		{rowId}
+		{scrollKey}
 		items={mods}
 		bind:this={virtualList}
 		bind:start={listStart}

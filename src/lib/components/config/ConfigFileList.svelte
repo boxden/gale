@@ -2,6 +2,7 @@
 	import ConfigFileListItem from '$lib/components/config/ConfigFileListItem.svelte';
 	import type { ConfigFile } from '$lib/types';
 	import SearchBar from '$lib/components/ui/SearchBar.svelte';
+	import { rememberScroll } from '$lib/scrollMemory';
 
 	import profiles from '$lib/state/profile.svelte';
 	import { m } from '$lib/paraglide/messages';
@@ -54,7 +55,7 @@
 	}
 </script>
 
-<div class="overflow-x-hidden overflow-y-auto p-4">
+<div class="overflow-x-hidden overflow-y-auto p-4" use:rememberScroll={'config'}>
 	<div class="relative mb-2">
 		<SearchBar bind:value={searchTerm} placeholder={m.configFileList_placeholder()} />
 	</div>

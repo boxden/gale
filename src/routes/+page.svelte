@@ -311,7 +311,7 @@
 				</HelpCard>
 			{/if}
 		{:else}
-			<ReorderableList bind:items {onmove} {reorderable}>
+			<ReorderableList bind:items {onmove} {reorderable} scrollKey="profile-mods">
 				{#snippet mod({ mod, index })}
 					<ProfileModListItem
 						{mod}

@@ -18,6 +18,7 @@
 
 	import Label from '$lib/components/ui/Label.svelte';
 	import { useNativeMenu, darkMode } from '$lib/state/theme.svelte';
+	import { rememberScroll } from '$lib/scrollMemory';
 	import Checkbox from '$lib/components/ui/Checkbox.svelte';
 	import games from '$lib/state/game.svelte';
 	import profiles from '$lib/state/profile.svelte';
@@ -85,7 +86,7 @@
 	}
 </script>
 
-<div class="relative w-full overflow-y-auto [transform:translateZ(0)]">
+<div class="relative w-full [transform:translateZ(0)] overflow-y-auto" use:rememberScroll={'prefs'}>
 	<div class="mx-auto flex w-full max-w-4xl flex-col gap-1 px-6 pt-2 pb-6">
 		{#if prefs !== null && gamePrefs !== null}
 			<LargeHeading>{m.prefs_global_title()}</LargeHeading>
