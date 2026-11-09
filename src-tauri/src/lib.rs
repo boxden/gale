@@ -4,6 +4,7 @@ use itertools::Itertools;
 use state::ManagerExt;
 use tauri::{App, AppHandle, Listener, Manager, RunEvent};
 use tauri_plugin_deep_link::DeepLinkExt;
+use tauri_plugin_window_state::AppHandleExt;
 use tracing::{debug, error, info, warn};
 
 mod cli;
@@ -143,7 +144,23 @@ fn initial_bg_color(app: &AppHandle) -> tauri::window::Color {
     }
 }
 
+fn window_state_flags() -> tauri_plugin_window_state::StateFlags {
+    // VISIBLE is excluded so the plugin doesn't show the window before the
+    // frontend is ready; the frontend re-applies the saved state itself.
+    tauri_plugin_window_state::StateFlags::all() - tauri_plugin_window_state::StateFlags::VISIBLE
+}
+
 fn event_handler(app: &AppHandle, event: RunEvent) {
+    if let RunEvent::WindowEvent {
+        event: tauri::WindowEvent::CloseRequested { .. },
+        ..
+    } = &event
+    {
+        // persist the geometry as soon as closing starts so it isn't lost
+        // if the process exits before RunEvent::Exit is reached
+        let _ = app.save_window_state(window_state_flags());
+    }
+
     if let RunEvent::ExitRequested { api, .. } = event {
         if !app.install_queue().lock().is_processing() {
             return;
@@ -316,10 +333,7 @@ pub fn run() {
         // frontend re-applies the saved state right before signaling ready.
         .plugin(
             tauri_plugin_window_state::Builder::new()
-                .with_state_flags(
-                    tauri_plugin_window_state::StateFlags::all()
-                        - tauri_plugin_window_state::StateFlags::VISIBLE,
-                )
+                .with_state_flags(window_state_flags())
                 .skip_initial_state("main")
                 .build(),
         )
