@@ -26,7 +26,7 @@
 	import UpdateAllBanner from '$lib/components/mod-list/UpdateAllBanner.svelte';
 	import { emit } from '@tauri-apps/api/event';
 	import ProfileLockedBanner from '$lib/components/mod-list/ProfileLockedBanner.svelte';
-	import { defaultContextItems } from '$lib/context';
+	import { getDefaultContextItems } from '$lib/context';
 	import ModDetails from '$lib/components/mod-list/ModDetails.svelte';
 	import ModListFilters from '$lib/components/mod-list/ModListFilters.svelte';
 	import UnknownModsBanner from '$lib/components/mod-list/UnknownModsBanner.svelte';
@@ -53,7 +53,7 @@
 		'downloads'
 	];
 
-	const contextItems: ModContextItem<ProfileMod>[] = [
+	const contextItems = $derived<ModContextItem<ProfileMod>[]>([
 		{
 			label: m.page_modContextItem_uninstall(),
 			icon: 'mdi:delete',
@@ -113,10 +113,10 @@
 			showFor: (mod) => mod.configFile != null,
 			onclick: (mod) => config.gotoModConfig(mod.configFile!)
 		},
-		...defaultContextItems.map((item) =>
+		...getDefaultContextItems().map((item) =>
 			mapModContextItem<Mod, ProfileMod>(item, (mod) => mod.data)
 		)
-	];
+	]);
 
 	let mods: ProfileMod[] = $state([]);
 	let items: ListItem[] = $state([]);

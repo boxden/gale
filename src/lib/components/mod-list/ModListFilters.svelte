@@ -25,7 +25,7 @@
 		return selected;
 	}
 
-	const optionsTranslate: Record<string, string> = {
+	const optionsTranslate = $derived<Record<string, string>>({
 		deprecated: m.modListFilters_options_deprecated(),
 		NSFW: m.modListFilters_options_NSFW(),
 		enabled: m.modListFilters_options_enabled(),
@@ -41,7 +41,7 @@
 		diskSpace: m.modListFilters_options_diskSpace(),
 		name: m.modListFilters_options_name(),
 		author: m.modListFilters_options_author()
-	};
+	});
 
 	function getOptionsLabel(item: string): string {
 		return optionsTranslate[item] ?? toSentenceCase(item);

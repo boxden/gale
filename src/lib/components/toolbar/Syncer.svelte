@@ -74,7 +74,7 @@
 		}[syncState]
 	);
 
-	const dropdownItems = [
+	const dropdownItems = $derived([
 		{
 			icon: 'mdi:database-eye',
 			label: m.syncer_dropdownItems_showOwnedProfiles(),
@@ -85,9 +85,9 @@
 			label: m.syncer_dropdownItems_login(),
 			onclick: onLoginClicked
 		}
-	];
+	]);
 
-	const copyItems = [
+	const copyItems = $derived([
 		{
 			icon: 'mdi:clipboard-text',
 			label: m.syncer_copyItems_copyCode(),
@@ -98,7 +98,7 @@
 			label: m.syncer_copyItems_copyLink(),
 			onclick: copyLink
 		}
-	];
+	]);
 
 	async function onLoginClicked() {
 		loginLoading = true;

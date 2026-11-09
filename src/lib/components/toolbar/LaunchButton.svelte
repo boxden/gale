@@ -16,12 +16,12 @@
 
 	type Mode = 'vanilla' | 'modded';
 
-	const labels: Record<Mode, string> = {
+	const labels = $derived<Record<Mode, string>>({
 		vanilla: m.toolBar_launch_vanilla(),
 		modded: m.toolBar_launch_modded()
-	};
+	});
 
-	const launchDropdownItems: ContextItem[] = [
+	const launchDropdownItems = $derived<ContextItem[]>([
 		{
 			label: labels['vanilla'],
 			onclick: () => {
@@ -36,7 +36,7 @@
 				launchGame();
 			}
 		}
-	];
+	]);
 
 	let launchDialogOpen = $state(false);
 	let launchDropdownOpen = $state(false);

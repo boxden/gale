@@ -159,7 +159,7 @@
 		() => data?.manifest.mods.some((mod) => mod.source === Backend.Hexium) ?? false
 	);
 
-	const configItems = [
+	const configItems = $derived([
 		{
 			value: ImportConfigOption.All,
 			label: m.importProfileDialog_configs_option_all(),
@@ -175,7 +175,7 @@
 			label: m.importProfileDialog_configs_option_none(),
 			description: m.importProfileDialog_configs_option_none_info()
 		}
-	];
+	]);
 
 	$effect(() => {
 		if (mode === 'overwrite' && isAvailable(name)) {

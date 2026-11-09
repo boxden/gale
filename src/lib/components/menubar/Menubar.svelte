@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import Icon from '@iconify/svelte';
 	import { Menubar } from 'bits-ui';
 
@@ -29,6 +29,7 @@
 	import { Menu, MenuItem, PredefinedMenuItem, Submenu } from '@tauri-apps/api/menu';
 	import profiles from '$lib/state/profile.svelte';
 	import { m } from '$lib/paraglide/messages';
+	import { getLocale } from '$lib/paraglide/runtime';
 
 	let importR2Open = $state(false);
 	let newProfileOpen = $state(false);
@@ -45,7 +46,7 @@
 
 	let menu: Menu | null = $state(null);
 
-	const submenus = [
+	const submenus = $derived([
 		{
 			text: m.menuBar_file_title(),
 			items: [
@@ -207,7 +208,7 @@
 				}
 			]
 		}
-	];
+	]);
 
 	const appWindow = getCurrentWindow();
 
@@ -417,21 +418,7 @@
 		d: () => openProfileOperation('duplicate')
 	};
 
-	onMount(async () => {
-		document.onkeydown = ({ key, ctrlKey }) => {
-			if (useNativeMenu.current) return; // Tauri handles shortcuts to the native menu
-
-			if (key === 'F2') {
-				openProfileOperation('rename');
-				return;
-			}
-
-			if (!ctrlKey) return;
-
-			let hotkey = hotkeys[key];
-			if (hotkey !== undefined) hotkey();
-		};
-
+	async function buildNativeMenu() {
 		let separator = await PredefinedMenuItem.new({
 			item: 'Separator'
 		});
@@ -455,8 +442,41 @@
 			)
 		);
 
-		menu = await Menu.new({
+		return Menu.new({
 			items: nativeMenus
+		});
+	}
+
+	onMount(async () => {
+		document.onkeydown = ({ key, ctrlKey }) => {
+			if (useNativeMenu.current) return; // Tauri handles shortcuts to the native menu
+
+			if (key === 'F2') {
+				openProfileOperation('rename');
+				return;
+			}
+
+			if (!ctrlKey) return;
+
+			let hotkey = hotkeys[key];
+			if (hotkey !== undefined) hotkey();
+		};
+
+		menu = await buildNativeMenu();
+	});
+
+	// rebuild the native menu when the language changes so its labels stay
+	// in sync (the custom menubar updates itself via the derived submenus)
+	let menuBuildSeq = 0;
+	$effect(() => {
+		getLocale();
+		if (!untrack(() => menu)) return;
+
+		const seq = ++menuBuildSeq;
+		void buildNativeMenu().then((newMenu) => {
+			if (seq !== menuBuildSeq) return;
+			// assigning menu re-triggers the effect above, which reapplies it
+			menu = newMenu;
 		});
 	});
 </script>

@@ -1,11 +1,13 @@
 import { m } from '$lib/paraglide/messages';
 import { getLocale, locales, setLocale, type Locale } from '$lib/paraglide/runtime';
+import { setCurrentLocale } from '$lib/state/locale.svelte';
 import { toSentenceCase as toSentenceCaseLatin } from 'js-convert-case';
 import * as api from '$lib/api';
 import { locale } from '@tauri-apps/plugin-os';
 
 export function setLanguage(lang: Locale | string) {
-	setLocale(lang as Locale);
+	setLocale(lang as Locale, { reload: false });
+	setCurrentLocale(lang as Locale);
 	console.log(`Language changed to ${lang}`);
 }
 
