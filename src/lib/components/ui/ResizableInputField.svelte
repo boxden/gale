@@ -10,6 +10,84 @@
 
 	let { value = $bindable(), mono = false, scrollKey, ...restProps }: Props = $props();
 
+	let textarea: HTMLTextAreaElement;
+
+	function startResize(evt: PointerEvent) {
+		if (evt.button !== 0) return;
+
+		const grip = evt.currentTarget as HTMLElement;
+		const node = textarea;
+		const startY = evt.clientY;
+		const startHeight = node.offsetHeight;
+		const minHeight = parseFloat(getComputedStyle(node).minHeight) || 0;
+
+		grip.setPointerCapture(evt.pointerId);
+		document.body.style.userSelect = 'none';
+
+		const onMove = (move: PointerEvent) => {
+			node.style.height = `${Math.max(minHeight, startHeight + move.clientY - startY)}px`;
+		};
+
+		const onEnd = () => {
+			grip.removeEventListener('pointermove', onMove);
+			grip.removeEventListener('pointerup', onEnd);
+			grip.removeEventListener('pointercancel', onEnd);
+			document.body.style.userSelect = '';
+		};
+
+		grip.addEventListener('pointermove', onMove);
+		grip.addEventListener('pointerup', onEnd);
+		grip.addEventListener('pointercancel', onEnd);
+	}
+
+	// collapsing the field shrinks the page and clamps its scroll position, so
+	// the scroll offsets are restored once the field has its size back
+	function saveScrollOffsets(node: HTMLElement) {
+		const offsets: { element: HTMLElement; top: number }[] = [
+			{ element: node, top: node.scrollTop }
+		];
+
+		for (let element = node.parentElement; element; element = element.parentElement) {
+			const { overflowY } = getComputedStyle(element);
+			if (
+				(overflowY === 'auto' || overflowY === 'scroll') &&
+				element.scrollHeight > element.clientHeight
+			) {
+				offsets.push({ element, top: element.scrollTop });
+			}
+		}
+
+		return offsets;
+	}
+
+	function fitToContent() {
+		const node = textarea;
+		const border = node.offsetHeight - node.clientHeight;
+
+		// overflowing content can be measured without collapsing the field
+		if (node.scrollHeight > node.clientHeight) {
+			node.style.height = `${node.scrollHeight + border}px`;
+			return;
+		}
+
+		const offsets = saveScrollOffsets(node);
+		const currentHeight = node.offsetHeight;
+
+		// the field is taller than its content, so collapse it to measure
+		node.style.height = '0px';
+		const contentHeight = node.scrollHeight + border;
+
+		if (Math.abs(currentHeight - contentHeight) <= 1) {
+			// already fitted: collapse back to the default height
+			node.style.height = '';
+			node.style.height = getComputedStyle(node).height;
+		} else {
+			node.style.height = `${contentHeight}px`;
+		}
+
+		for (const { element, top } of offsets) element.scrollTop = top;
+	}
+
 	// a drag-resize becomes inline width/height; saving that pair rather than
 	// the laid-out box keeps the chosen size even when the parent clamps the
 	// rendered width, and sessionStorage scopes the memory to this session
@@ -54,12 +132,29 @@
 	}
 </script>
 
-<textarea
-	bind:value
-	use:rememberScroll={scrollKey ?? null}
-	use:rememberSize={scrollKey}
-	{...restProps}
-	autocomplete="off"
-	class="valid:focus:ring-accent-600 text-primary-700 placeholder-primary-500 hover:border-primary-400 dark:valid:focus:ring-accent-400 dark:bg-primary-900 dark:text-primary-300 dark:placeholder-primary-400 dark:hover:border-primary-500 bg-primary-100 h-40 max-w-full min-h-11 w-full rounded-lg border border-transparent px-3 py-2 invalid:ring-red-500 focus:border-transparent focus:ring-2 focus:outline-hidden"
-	class:font-mono={mono}
-></textarea>
+<div class="relative w-full">
+	<!-- clips the scrollbar corner to the rounded field outline -->
+	<div
+		class="has-[textarea:valid]:focus-within:ring-accent-600 dark:has-[textarea:valid]:focus-within:ring-accent-400 inline-block w-full overflow-hidden rounded-lg focus-within:ring-2 has-[textarea:invalid]:ring-1 has-[textarea:invalid]:ring-red-500 has-[textarea:invalid]:focus-within:ring-2"
+	>
+		<textarea
+			bind:this={textarea}
+			bind:value
+			use:rememberScroll={scrollKey ?? null}
+			use:rememberSize={scrollKey}
+			{...restProps}
+			autocomplete="off"
+			class="text-primary-700 placeholder-primary-500 hover:border-primary-400 dark:bg-primary-900 dark:text-primary-300 dark:placeholder-primary-400 dark:hover:border-primary-500 bg-primary-100 block h-40 min-h-11 w-full max-w-full rounded-lg border border-transparent px-3 py-2 focus:border-transparent focus:outline-hidden"
+			class:font-mono={mono}
+		></textarea>
+	</div>
+
+	<!-- stops before the scrollbars so their corner and the native resizer stay usable -->
+	<div
+		class="absolute right-5 bottom-0 left-0 h-2 cursor-ns-resize touch-none"
+		role="separator"
+		aria-orientation="horizontal"
+		onpointerdown={startResize}
+		ondblclick={fitToContent}
+	></div>
+</div>
