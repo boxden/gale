@@ -8,7 +8,7 @@ use itertools::Itertools;
 use state::ManagerExt;
 use tauri::{App, AppHandle, Listener, Manager, RunEvent};
 use tauri_plugin_deep_link::DeepLinkExt;
-use tauri_plugin_window_state::AppHandleExt;
+use tauri_plugin_window_state::{AppHandleExt, StateFlags, WindowExt};
 use tracing::{debug, error, info, warn};
 
 mod cli;
@@ -51,6 +51,23 @@ fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if let Some(window) = app.get_webview_window("main") {
+        // Match the title bar to the persisted preference before restoring the
+        // geometry, so the saved inner size isn't offset by a native frame that
+        // is about to be removed (and no native bar shows over the menubar).
+        if let Err(err) = window.set_decorations(initial_decorations(app.handle())) {
+            warn!("failed to set initial window decorations: {err}");
+        }
+
+        // Restore the saved geometry here, while the plugin's cache still holds
+        // the on-disk state and the window is hidden. Its own resize/move
+        // listeners overwrite that cache with the startup geometry as soon as
+        // the event loop runs, so a later restore would read the wrong values.
+        // Maximized/fullscreen are deferred to the ready handler because
+        // applying them shows the window before the webview has painted.
+        if let Err(err) = window.restore_state(StateFlags::SIZE | StateFlags::POSITION) {
+            warn!("failed to restore window geometry: {err}");
+        }
+
         match window.set_background_color(Some(initial_bg_color(app.handle()))) {
             Ok(()) => debug!("set initial window background color"),
             Err(err) => warn!("failed to set initial window background color: {err}"),
@@ -80,6 +97,15 @@ fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
 
         // refresh the background color in case the setup-time call was too early
         let _ = window.set_background_color(Some(initial_bg_color(&handle)));
+
+        // Apply maximized/fullscreen only once, right before the first show, so
+        // they don't reveal the window while the webview is still blank and a
+        // later page reload doesn't re-maximize a window the user restored.
+        if !WINDOW_STATE_RESTORED.swap(true, Ordering::AcqRel) {
+            if let Err(err) = window.restore_state(StateFlags::MAXIMIZED | StateFlags::FULLSCREEN) {
+                warn!("failed to restore window maximized state: {err}");
+            }
+        }
 
         if let Err(err) = window.show() {
             warn!("failed to show main window: {err}");
@@ -148,14 +174,42 @@ fn initial_bg_color(app: &AppHandle) -> tauri::window::Color {
     }
 }
 
+// The title bar follows the persisted native-menu preference. Resolve it the
+// same way as the background color so the frame is correct before the window
+// is shown, even if the frontend is slow to load.
+fn initial_decorations(app: &AppHandle) -> bool {
+    let native = app
+        .path()
+        .app_config_dir()
+        .ok()
+        .and_then(|dir| std::fs::read_to_string(dir.join("ui-state.json")).ok())
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+        .and_then(|json| {
+            let value = json.get("useNativeMenu")?;
+            value
+                .as_str()
+                .map(str::to_owned)
+                .or_else(|| value.as_bool().map(|b| b.to_string()))
+        })
+        .map(|value| value == "true")
+        .unwrap_or(!cfg!(target_os = "windows"));
+
+    debug!(native, "resolved initial window decorations");
+
+    native
+}
+
 fn window_state_flags() -> tauri_plugin_window_state::StateFlags {
-    // VISIBLE is excluded so the plugin doesn't show the window before the
-    // frontend is ready; the frontend re-applies the saved state itself.
-    tauri_plugin_window_state::StateFlags::all() - tauri_plugin_window_state::StateFlags::VISIBLE
+    // VISIBLE is excluded so the plugin never shows the window before the
+    // frontend is ready. DECORATIONS is excluded because the title bar follows
+    // the native-menu preference, not the saved window state; restoring it here
+    // could re-enable the native frame on top of the custom menubar.
+    StateFlags::all() - StateFlags::VISIBLE - StateFlags::DECORATIONS
 }
 
 const WINDOW_STATE_SAVE_DELAY: Duration = Duration::from_millis(500);
 
+static WINDOW_STATE_RESTORED: AtomicBool = AtomicBool::new(false);
 static WINDOW_STATE_CHANGES: AtomicU64 = AtomicU64::new(0);
 static WINDOW_STATE_SAVE_PENDING: AtomicBool = AtomicBool::new(false);
 
@@ -389,10 +443,10 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_clipboard_manager::init())
-        // the window is shown manually once the frontend signals readiness.
-        // the plugin must not restore the saved visible state on startup
-        // (restoring e.g. maximized would show the window early), and the
-        // frontend re-applies the saved state right before signaling ready.
+        // The window is shown manually once the frontend signals readiness, so
+        // the plugin must not restore on window-ready (that would apply the
+        // saved maximized state and show the window while it is still blank).
+        // setup() and the ready handler restore the state themselves instead.
         .plugin(
             tauri_plugin_window_state::Builder::new()
                 .with_state_flags(window_state_flags())

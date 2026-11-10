@@ -22,7 +22,6 @@
 		"dialog:default",
 		"shell:default",
 		"os:allow-locale",
-		"store:default",
-		"window-state:allow-restore-state"
+		"store:default"
 	]
 }

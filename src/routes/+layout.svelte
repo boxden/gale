@@ -89,15 +89,6 @@
 			);
 			document.documentElement.classList.remove('theme-loading');
 
-			// restore the saved window geometry once per session; re-applying
-			// it on page reloads (e.g. language switch) would reset the window
-			// while it's visible
-			if (!sessionStorage.getItem('window-state-restored')) {
-				invoke('plugin:window-state|restore_state', { label: 'main' })
-					.then(() => sessionStorage.setItem('window-state-restored', 'true'))
-					.catch(() => {});
-			}
-
 			// match the webview's default background to the app theme so the
 			// first visible frame doesn't flash a foreign color
 			syncWindowBackground();

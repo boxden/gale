@@ -397,15 +397,20 @@
 		}
 	}
 
+	// Apply decorations as soon as the preference is known rather than waiting
+	// for the native menu to finish building; otherwise the config's native
+	// title bar stays visible on top of the custom menubar at startup.
 	$effect(() => {
-		if (menu) {
-			appWindow.setDecorations(useNativeMenu.current);
+		appWindow.setDecorations(useNativeMenu.current);
+	});
 
-			if (useNativeMenu.current) {
-				menu.setAsAppMenu();
-			} else {
-				Menu.new().then((menu) => menu.setAsAppMenu());
-			}
+	$effect(() => {
+		if (!menu) return;
+
+		if (useNativeMenu.current) {
+			menu.setAsAppMenu();
+		} else {
+			Menu.new().then((menu) => menu.setAsAppMenu());
 		}
 	});
 
