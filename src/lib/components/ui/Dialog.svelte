@@ -70,7 +70,7 @@
 					<div
 						{...props}
 						transition:fade={{ duration: 80 }}
-						class="fixed inset-0 z-0 rounded-lg"
+						class="fixed inset-0 z-20 rounded-lg"
 						style="background-color: rgba(0, 0, 0, calc(60%/(var(--bits-dialog-depth) + var(--bits-dialog-nested-count) + 1))); {style}"
 					></div>
 				{/if}
@@ -83,7 +83,7 @@
 			class="pointer-events-none"
 		>
 			{#if open}
-				<div class="pointer-events-none fixed inset-0 flex items-center justify-center">
+				<div class="pointer-events-none fixed inset-0 z-30 flex items-center justify-center">
 					<div
 						class={[
 							large ? 'max-w-240' : 'max-w-140',

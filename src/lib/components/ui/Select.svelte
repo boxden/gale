@@ -92,7 +92,7 @@
 					{#if open}
 						<div
 							{...props}
-							class="border-primary-300 dark:border-primary-600 dark:bg-primary-800 flex max-h-96 w-(--bits-select-anchor-width) gap-0.5 overflow-y-auto rounded-lg border bg-white p-1 shadow-xl"
+							class="z-40 border-primary-300 dark:border-primary-600 dark:bg-primary-800 flex max-h-96 w-(--bits-select-anchor-width) gap-0.5 overflow-y-auto rounded-lg border bg-white p-1 shadow-xl"
 							in:fly={dropIn}
 							out:fade={dropOut}
 						>
