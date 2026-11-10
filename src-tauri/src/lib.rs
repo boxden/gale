@@ -1,4 +1,8 @@
-use std::env;
+use std::{
+    env,
+    sync::atomic::{AtomicBool, AtomicU64, Ordering},
+    time::Duration,
+};
 
 use itertools::Itertools;
 use state::ManagerExt;
@@ -150,6 +154,56 @@ fn window_state_flags() -> tauri_plugin_window_state::StateFlags {
     tauri_plugin_window_state::StateFlags::all() - tauri_plugin_window_state::StateFlags::VISIBLE
 }
 
+const WINDOW_STATE_SAVE_DELAY: Duration = Duration::from_millis(500);
+
+static WINDOW_STATE_CHANGES: AtomicU64 = AtomicU64::new(0);
+static WINDOW_STATE_SAVE_PENDING: AtomicBool = AtomicBool::new(false);
+
+// dragging the window fires move and resize events continuously; persist the
+// geometry once the user stops instead of writing on every event
+fn debounce_window_state_save(app: &AppHandle) {
+    // events fired while the window is hidden are part of startup, before the
+    // saved geometry has been restored, and must not overwrite it
+    let shown = app
+        .get_webview_window("main")
+        .and_then(|window| window.is_visible().ok())
+        .unwrap_or(false);
+
+    if !shown {
+        return;
+    }
+
+    WINDOW_STATE_CHANGES.fetch_add(1, Ordering::Relaxed);
+
+    if WINDOW_STATE_SAVE_PENDING.swap(true, Ordering::AcqRel) {
+        return;
+    }
+
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        loop {
+            let changes = WINDOW_STATE_CHANGES.load(Ordering::Relaxed);
+            tokio::time::sleep(WINDOW_STATE_SAVE_DELAY).await;
+
+            if WINDOW_STATE_CHANGES.load(Ordering::Relaxed) != changes {
+                continue;
+            }
+
+            let _ = app.save_window_state(window_state_flags());
+
+            WINDOW_STATE_SAVE_PENDING.store(false, Ordering::Release);
+
+            // a change arriving during the save saw the pending flag still
+            // set, so it needs to be rescheduled here
+            if WINDOW_STATE_CHANGES.load(Ordering::Relaxed) != changes {
+                debounce_window_state_save(&app);
+            }
+
+            break;
+        }
+    });
+}
+
 fn event_handler(app: &AppHandle, event: RunEvent) {
     if let RunEvent::WindowEvent {
         event: tauri::WindowEvent::CloseRequested { .. },
@@ -159,6 +213,14 @@ fn event_handler(app: &AppHandle, event: RunEvent) {
         // persist the geometry as soon as closing starts so it isn't lost
         // if the process exits before RunEvent::Exit is reached
         let _ = app.save_window_state(window_state_flags());
+    }
+
+    if let RunEvent::WindowEvent {
+        event: tauri::WindowEvent::Resized(_) | tauri::WindowEvent::Moved(_),
+        ..
+    } = &event
+    {
+        debounce_window_state_save(app);
     }
 
     if let RunEvent::ExitRequested { api, .. } = event {
