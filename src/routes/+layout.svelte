@@ -19,6 +19,7 @@
 	import type { ProfileInfo, ManagedGameInfo } from '$lib/types';
 	import { refreshLanguage } from '$lib/i18n';
 	import { storeLoaded } from '$lib/state/persisted-state.svelte';
+	import { darkMode, primaryColorSetting } from '$lib/state/theme.svelte';
 	import MissingProfilesDialog from '$lib/components/dialogs/MissingProfilesDialog.svelte';
 
 	type Props = {
@@ -26,6 +27,41 @@
 	};
 
 	let { children }: Props = $props();
+
+	function syncWindowBackground() {
+		const main = document.querySelector('main');
+		if (!main) return;
+
+		// computed theme colors can be oklch, which the canvas normalizes to
+		// the sRGB bytes the window background API expects
+		const canvas = document.createElement('canvas');
+		canvas.width = canvas.height = 1;
+		const ctx = canvas.getContext('2d', { willReadFrequently: true });
+		if (!ctx) return;
+
+		ctx.fillStyle = getComputedStyle(main).backgroundColor;
+		ctx.fillRect(0, 0, 1, 1);
+		const [red, green, blue] = ctx.getImageData(0, 0, 1, 1).data;
+
+		invoke('set_window_background_color', { red, green, blue }).catch(() => {});
+	}
+
+	// the webview paints its own background in the gaps exposed while the
+	// window is resized, so it must follow runtime theme changes too
+	$effect(() => {
+		darkMode.current;
+		primaryColorSetting.current;
+
+		let inner = 0;
+		const outer = requestAnimationFrame(() => {
+			inner = requestAnimationFrame(syncWindowBackground);
+		});
+
+		return () => {
+			cancelAnimationFrame(outer);
+			cancelAnimationFrame(inner);
+		};
+	});
 
 	let unlistenProfiles: UnlistenFn | null;
 	let unlistenGames: UnlistenFn | null;
@@ -64,15 +100,7 @@
 
 			// match the webview's default background to the app theme so the
 			// first visible frame doesn't flash a foreign color
-			const bg = getComputedStyle(document.querySelector('main')!).backgroundColor;
-			const rgb = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-			if (rgb) {
-				invoke('set_window_background_color', {
-					red: Number(rgb[1]),
-					green: Number(rgb[2]),
-					blue: Number(rgb[3])
-				}).catch(() => {});
-			}
+			syncWindowBackground();
 
 			// wait for the first painted frames so the window isn't shown mid-render
 			setTimeout(() => emit('ready'), 100);
