@@ -1,5 +1,6 @@
 use std::{
     borrow::Cow,
+    collections::HashSet,
     fs,
     hash::{self, Hash},
     sync::LazyLock,
@@ -39,8 +40,10 @@ static GAMES: LazyLock<(DateTime<Utc>, Vec<GameData<'static>>)> = LazyLock::new(
     if !cfg!(debug_assertions) {
         match get_cached_games() {
             Ok(cache) => {
+                let mut games = cache.games;
+                dedup_games(&mut games);
                 info!("using cached games list, last commit at {}", cache.date);
-                return (cache.date, cache.games);
+                return (cache.date, games);
             }
             Err(err) => {
                 warn!("failed to read cached games list: {err}");
@@ -52,11 +55,18 @@ static GAMES: LazyLock<(DateTime<Utc>, Vec<GameData<'static>>)> = LazyLock::new(
 
     info!("using bundled games list (built at {updated_at})");
 
-    (
-        updated_at,
-        serde_json::from_str(BUNDLED_GAMES_JSON).unwrap(),
-    )
+    let mut games: Vec<GameData<'static>> = serde_json::from_str(BUNDLED_GAMES_JSON).unwrap();
+    dedup_games(&mut games);
+
+    (updated_at, games)
 });
+
+// the remote list is maintained outside this repository and can repeat a game;
+// keep the first entry for each slug so it isn't listed more than once
+fn dedup_games(games: &mut Vec<GameData<'_>>) {
+    let mut seen = HashSet::new();
+    games.retain(|game| seen.insert(game.slug.clone()));
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 struct GamesCache<'a> {
@@ -89,7 +99,8 @@ pub async fn update_list_task(app: &AppHandle) -> Result<()> {
         .text()
         .await?;
 
-    let games: Vec<GameData<'_>> = serde_json::from_str(&str)?;
+    let mut games: Vec<GameData<'_>> = serde_json::from_str(&str)?;
+    dedup_games(&mut games);
 
     let date = get_last_commit_date(app).await.unwrap_or_else(|err| {
         warn!("failed to get last commit date: {err}");
