@@ -435,9 +435,38 @@
 		// position. saveAnchor keeps the map fresh while scrolling instead.
 	});
 
-	// whenever `items` changes, invalidate the current heightmap
+	// the viewport height changes on every frame while the window is resized,
+	// so refresh passes could pile up on top of each other; run them one at a
+	// time and repeat only when newer state arrived in the meantime
+	let refreshItems: T[] = [];
+	let refreshHeight = 0;
+	let refreshItemHeight: number | undefined;
+	let refreshing = false;
+	let refreshPending = false;
+
+	async function refreshNext() {
+		if (refreshing) {
+			refreshPending = true;
+			return;
+		}
+
+		refreshing = true;
+		try {
+			do {
+				refreshPending = false;
+				await refresh(refreshItems, refreshHeight, refreshItemHeight);
+			} while (refreshPending);
+		} finally {
+			refreshing = false;
+		}
+	}
+
+	// whenever `items` or the viewport size changes, invalidate the heightmap
 	run(() => {
-		if (mounted) refresh(items, viewportHeight, itemHeight);
+		refreshItems = items;
+		refreshHeight = viewportHeight;
+		refreshItemHeight = itemHeight;
+		if (mounted) void refreshNext();
 	});
 </script>
 
