@@ -102,8 +102,8 @@
 			// first visible frame doesn't flash a foreign color
 			syncWindowBackground();
 
-			// wait for the first painted frames so the window isn't shown mid-render
-			setTimeout(() => emit('ready'), 100);
+			// reveal after the next painted frame instead of an arbitrary delay
+			requestAnimationFrame(() => requestAnimationFrame(() => emit('ready')));
 		});
 
 		return () => {
