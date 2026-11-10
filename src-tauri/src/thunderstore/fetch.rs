@@ -5,10 +5,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-use bytes::Bytes;
 use eyre::{Report, Result};
 use flate2::read::GzDecoder;
 use futures_util::{StreamExt, TryFutureExt, future, stream};
+use http_cache_reqwest::CacheMode;
 use indexmap::IndexMap;
 use serde::Serialize;
 use tauri::AppHandle;
@@ -177,7 +177,15 @@ async fn fetch_single_packages(
                 return Ok(0);
             }
             res = async {
-                let response = app.http().get(&index_url).send().await?;
+                // the index is a small gzipped list of content-addressed chunk
+                // URLs; caching it lets an unchanged list revalidate without
+                // re-downloading the package chunks
+                let response = app
+                    .http()
+                    .get(&index_url)
+                    .with_extension(CacheMode::Default)
+                    .send()
+                    .await?;
                 let bytes = response.error_for_status()?.bytes().await?;
 
                 Ok::<_, reqwest_middleware::Error>(bytes)
@@ -211,11 +219,7 @@ async fn fetch_single_packages(
                         break;
                     };
 
-                    let mut text = String::new();
-                    let mut decoder = GzDecoder::new(&chunk[..]);
-                    decoder.read_to_string(&mut text)?;
-
-                    let packages: Vec<PackageListing> = serde_json::from_str(&text)?;
+                    let packages = chunk?;
 
                     let packages = packages
                         .into_iter()
@@ -282,7 +286,7 @@ async fn fetch_single_packages(
     }
 
     async fn fetch_chunks(
-        tx: mpsc::Sender<Bytes>,
+        tx: mpsc::Sender<Result<Vec<PackageListing>>>,
         urls: Vec<String>,
         app: AppHandle,
     ) -> Result<()> {
@@ -290,15 +294,33 @@ async fn fetch_single_packages(
             .map(|url| {
                 let app = app.clone();
                 async move {
-                    let bytes = app.http().get(url).send().await?.bytes().await?;
-                    Ok::<_, eyre::Report>(bytes)
+                    // chunk URLs contain the content hash, so cached copies
+                    // are immutable and can be reused across launches
+                    let bytes = app
+                        .http()
+                        .get(url)
+                        .with_extension(CacheMode::ForceCache)
+                        .send()
+                        .await?
+                        .bytes()
+                        .await?;
+
+                    // parsing a chunk takes hundreds of milliseconds, so do it
+                    // on a blocking thread and let the other chunks download
+                    Ok::<_, eyre::Report>(
+                        tokio::task::spawn_blocking(move || -> Result<Vec<PackageListing>> {
+                            let mut text = String::new();
+                            GzDecoder::new(&bytes[..]).read_to_string(&mut text)?;
+                            Ok(serde_json::from_str(&text)?)
+                        })
+                        .await??,
+                    )
                 }
             })
             .buffer_unordered(4);
 
         while let Some(chunk) = chunks.next().await {
-            let bytes = chunk?;
-            if tx.send(bytes).await.is_err() {
+            if tx.send(chunk).await.is_err() {
                 debug!("chunk channel closed early, stopping package fetch");
                 break;
             }
