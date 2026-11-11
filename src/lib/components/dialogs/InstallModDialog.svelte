@@ -47,7 +47,6 @@
 	<Select
 		triggerClass="w-full"
 		items={selectItems(profiles.list.map((profile) => profile.name))}
-		avoidCollisions={false}
 		type="single"
 		bind:value={profileName}
 	/>

@@ -5,11 +5,14 @@
 	import type { ClassValue } from 'clsx';
 	import { fade, fly } from 'svelte/transition';
 	import DropdownArrow from './DropdownArrow.svelte';
+	import ScrollFade from './ScrollFade.svelte';
 
 	type Props = Combobox.RootProps & {
 		triggerClass?: ClassValue;
 		placeholder?: string;
 	};
+
+	let content = $state<HTMLDivElement>();
 
 	let {
 		items = [],
@@ -57,43 +60,52 @@
 		>
 	</div>
 	<Combobox.Portal>
-		<Combobox.Content forceMount>
+		<Combobox.Content forceMount side="bottom" avoidCollisions={false} collisionPadding={8}>
 			{#snippet child({ wrapperProps, props, open })}
 				<div {...wrapperProps}>
 					{#if open}
-						<div
-							{...props}
-							class="z-40 border-primary-300 dark:border-primary-600 dark:bg-primary-800 flex max-h-96 w-[var(--bits-combobox-anchor-width)] gap-0.5 overflow-y-auto rounded-lg border bg-white p-1 shadow-xl"
-							in:fly={dropIn}
-							out:fade={dropOut}
-						>
-							{#each filteredItems as item, i (i + item.value)}
-								<Combobox.Item
-									{...item}
-									class="hover:text-primary-800 group dark:hover:bg-primary-700 dark:hover:text-primary-200 hover:bg-primary-200 flex w-full cursor-default items-center rounded-md px-3 py-1"
+						<div class="relative">
+							<div
+								class="border-primary-300 dark:border-primary-600 dark:bg-primary-800 z-40 w-[var(--bits-combobox-anchor-width)] rounded-lg border bg-white shadow-xl"
+							>
+								<div
+									bind:this={content}
+									{...props}
+									class="flex max-h-96 w-full gap-0.5 overflow-y-auto p-1"
+									in:fly={dropIn}
+									out:fade={dropOut}
 								>
-									{#snippet children({ selected, highlighted })}
-										<span
-											class={[
-												selected || highlighted
-													? 'text-primary-700 dark:text-primary-300'
-													: 'text-primary-500 group-hover:text-primary-700 dark:text-primary-400 dark:group-hover:text-primary-300'
-											]}>{item.label}</span
+									{#each filteredItems as item, i (i + item.value)}
+										<Combobox.Item
+											{...item}
+											class="hover:text-primary-800 group dark:hover:bg-primary-700 dark:hover:text-primary-200 hover:bg-primary-200 flex w-full cursor-default items-center rounded-md px-3 py-1"
 										>
+											{#snippet children({ selected, highlighted })}
+												<span
+													class={[
+														selected || highlighted
+															? 'text-primary-700 dark:text-primary-300'
+															: 'text-primary-500 group-hover:text-primary-700 dark:text-primary-400 dark:group-hover:text-primary-300'
+													]}>{item.label}</span
+												>
 
-										{#if selected}
-											<Icon
-												icon="mdi:check"
-												class="text-accent-600 dark:text-accent-400 ml-auto text-lg"
-											/>
-										{/if}
-									{/snippet}
-								</Combobox.Item>
-							{:else}
-								<span class="w-full text-center text-primary-500 py-1 dark:text-primary-400">
-									No results found
-								</span>
-							{/each}
+												{#if selected}
+													<Icon
+														icon="mdi:check"
+														class="text-accent-600 dark:text-accent-400 ml-auto text-lg"
+													/>
+												{/if}
+											{/snippet}
+										</Combobox.Item>
+									{:else}
+										<span class="w-full text-center text-primary-500 py-1 dark:text-primary-400">
+											No results found
+										</span>
+									{/each}
+								</div>
+							</div>
+
+							<ScrollFade scroller={content} />
 						</div>
 					{/if}
 				</div>

@@ -247,7 +247,6 @@
 						triggerClass="grow"
 						items={selectItems(profiles.list.map((profile) => profile.name))}
 						type="single"
-						avoidCollisions={false}
 						bind:value={name}
 					/>
 				</div>

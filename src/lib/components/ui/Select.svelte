@@ -7,13 +7,13 @@
 	import type { Snippet } from 'svelte';
 	import { fade, fly } from 'svelte/transition';
 	import DropdownArrow from './DropdownArrow.svelte';
+	import ScrollFade from './ScrollFade.svelte';
 
 	type Props = WithoutChildren<Select.RootProps> & {
 		placeholder?: string;
 		items: { value: string; label: string; description?: string; disabled?: boolean }[];
 		triggerClass?: string;
 		icon?: string;
-		avoidCollisions?: boolean;
 		item?: Snippet<[{ label: string; value: string; selected: boolean }]>;
 	} & (
 			| {
@@ -29,6 +29,8 @@
 			  }
 		);
 
+	let content = $state<HTMLDivElement>();
+
 	let {
 		open = $bindable(false),
 		value = $bindable(),
@@ -36,7 +38,6 @@
 		items,
 		placeholder,
 		icon,
-		avoidCollisions,
 		label,
 		item: itemSnippet,
 		...restProps
@@ -86,55 +87,60 @@
 		/>
 	</Select.Trigger>
 	<Select.Portal>
-		<Select.Content forceMount {avoidCollisions}>
+		<Select.Content forceMount side="bottom" avoidCollisions={false} collisionPadding={8}>
 			{#snippet child({ wrapperProps, props, open })}
 				<div {...wrapperProps}>
 					{#if open}
-						<div
-							{...props}
-							class="z-40 border-primary-300 dark:border-primary-600 dark:bg-primary-800 flex max-h-96 w-(--bits-select-anchor-width) gap-0.5 overflow-y-auto rounded-lg border bg-white p-1 shadow-xl"
-							in:fly={dropIn}
-							out:fade={dropOut}
-						>
-							<Select.Viewport>
-								{#each items as item, i (i + item.value)}
-									{@const { description, ...itemProps } = item}
-									<Select.Item
-										{...itemProps}
-										class="hover:text-primary-800 group dark:hover:bg-primary-700 dark:hover:text-primary-200 hover:bg-primary-200 flex w-full cursor-default items-center rounded-md px-3 py-1"
-									>
-										{#snippet children({ selected })}
-											{#if itemSnippet}
-												{@render itemSnippet({ ...item, selected })}
-											{/if}
-
-											<div class="flex grow flex-col overflow-hidden">
-												<span
-													class={[
-														'overflow-hidden text-nowrap',
-														selected
-															? 'text-primary-700 dark:text-primary-300'
-															: 'text-primary-500 group-hover:text-primary-700 dark:text-primary-400 dark:group-hover:text-primary-300'
-													]}>{item.label}</span
-												>
-
-												{#if description}
-													<span class="text-primary-500 dark:text-primary-400 text-xs">
-														{description}
-													</span>
+						<div class="relative">
+							<div
+								bind:this={content}
+								{...props}
+								class="border-primary-300 dark:border-primary-600 dark:bg-primary-800 z-40 flex max-h-96 w-(--bits-select-anchor-width) gap-0.5 overflow-y-auto rounded-lg border bg-white p-1 shadow-xl"
+								in:fly={dropIn}
+								out:fade={dropOut}
+							>
+								<Select.Viewport>
+									{#each items as item, i (i + item.value)}
+										{@const { description, ...itemProps } = item}
+										<Select.Item
+											{...itemProps}
+											class="hover:text-primary-800 group dark:hover:bg-primary-700 dark:hover:text-primary-200 hover:bg-primary-200 flex w-full cursor-default items-center rounded-md px-3 py-1"
+										>
+											{#snippet children({ selected })}
+												{#if itemSnippet}
+													{@render itemSnippet({ ...item, selected })}
 												{/if}
-											</div>
 
-											{#if selected}
-												<Icon
-													icon="mdi:check"
-													class="text-accent-600 dark:text-accent-400 ml-auto shrink-0 text-lg"
-												/>
-											{/if}
-										{/snippet}
-									</Select.Item>
-								{/each}
-							</Select.Viewport>
+												<div class="flex grow flex-col overflow-hidden">
+													<span
+														class={[
+															'overflow-hidden text-nowrap',
+															selected
+																? 'text-primary-700 dark:text-primary-300'
+																: 'text-primary-500 group-hover:text-primary-700 dark:text-primary-400 dark:group-hover:text-primary-300'
+														]}>{item.label}</span
+													>
+
+													{#if description}
+														<span class="text-primary-500 dark:text-primary-400 text-xs">
+															{description}
+														</span>
+													{/if}
+												</div>
+
+												{#if selected}
+													<Icon
+														icon="mdi:check"
+														class="text-accent-600 dark:text-accent-400 ml-auto shrink-0 text-lg"
+													/>
+												{/if}
+											{/snippet}
+										</Select.Item>
+									{/each}
+								</Select.Viewport>
+							</div>
+
+							<ScrollFade container={content} />
 						</div>
 					{/if}
 				</div>
