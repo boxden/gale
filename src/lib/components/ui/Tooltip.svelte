@@ -10,6 +10,7 @@
 		sideOffset?: number;
 		delayDuration?: number;
 		disabled?: boolean;
+		ignoreNonKeyboardFocus?: boolean;
 		class?: string;
 		children?: Snippet;
 	} & (
@@ -26,6 +27,7 @@
 		sideOffset = 0,
 		delayDuration = 400,
 		disabled = false,
+		ignoreNonKeyboardFocus = false,
 		class: triggerClass,
 		children,
 		tooltip
@@ -41,7 +43,7 @@
 	);
 </script>
 
-<Tooltip.Root {delayDuration}>
+<Tooltip.Root {delayDuration} {ignoreNonKeyboardFocus}>
 	<Tooltip.Trigger class={triggerClass} {disabled}>
 		{@render children?.()}
 	</Tooltip.Trigger>
