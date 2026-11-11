@@ -63,26 +63,38 @@
 	function fitToContent() {
 		const node = textarea;
 		const border = node.offsetHeight - node.clientHeight;
-
-		// overflowing content can be measured without collapsing the field
-		if (node.scrollHeight > node.clientHeight) {
-			node.style.height = `${node.scrollHeight + border}px`;
-			return;
-		}
-
 		const offsets = saveScrollOffsets(node);
 		const currentHeight = node.offsetHeight;
 
-		// the field is taller than its content, so collapse it to measure
-		node.style.height = '0px';
-		const contentHeight = node.scrollHeight + border;
+		// measure the default height without the inline height applied
+		const previousHeight = node.style.height;
+		node.style.height = '';
+		const defaultHeight = node.offsetHeight;
+		node.style.height = previousHeight;
 
-		if (Math.abs(currentHeight - contentHeight) <= 1) {
-			// already fitted: collapse back to the default height
+		if (Math.abs(currentHeight - defaultHeight) > 1) {
+			// any other size collapses back to the default height
 			node.style.height = '';
 			node.style.height = getComputedStyle(node).height;
 		} else {
-			node.style.height = `${contentHeight}px`;
+			// at the default height, expand to the content but keep the bottom
+			// handle reachable: no taller than 70% of the viewport, with an
+			// internal scrollbar beyond that
+			const maxHeight = window.innerHeight * 0.7;
+			let contentHeight;
+
+			if (node.scrollHeight > node.clientHeight) {
+				// overflowing content can be measured without collapsing the field
+				contentHeight = node.scrollHeight + border;
+			} else {
+				// the field is taller than its content, so collapse it to measure
+				node.style.height = '0px';
+				contentHeight = node.scrollHeight + border;
+			}
+
+			const targetHeight = Math.max(defaultHeight, Math.min(contentHeight, maxHeight));
+
+			node.style.height = `${targetHeight}px`;
 		}
 
 		for (const { element, top } of offsets) element.scrollTop = top;
