@@ -8,6 +8,7 @@
 	// fire immediately while refresh() updates the data in the background.
 	let cachedMods: BrowsedMod[] = [];
 	let cachedGame: string | null = null;
+	let cachedSelectedKey: string | null = null;
 </script>
 
 <script lang="ts">
@@ -57,9 +58,14 @@
 	const initialGame = untrack(() => games.active?.slug ?? null);
 	const scrollKey = $derived(`browse-mods:${games.active?.slug ?? 'none'}`);
 
+	if (cachedGame !== initialGame) cachedSelectedKey = null;
+
 	let mods: BrowsedMod[] = $state(cachedGame === initialGame ? cachedMods : []);
 	// prefetch enough mods for the remembered anchor index to exist
 	let maxCount: number = $state(maxInitialCount(initialGame));
+	let selectedMod: BrowsedMod | null = $state(
+		cachedSelectedKey ? findItemByUuid(cachedSelectedKey) : null
+	);
 	let lastGame = initialGame;
 
 	function maxInitialCount(game: string | null) {
@@ -72,9 +78,9 @@
 		lastGame = game;
 		mods = cachedGame === game ? cachedMods : [];
 		maxCount = maxInitialCount(game);
+		selectedMod = null;
+		cachedSelectedKey = null;
 	});
-
-	let selectedMod: BrowsedMod | null = $state(null);
 	let foreignDownloadDialogOpen = $state(false);
 
 	let installId: ModId;
@@ -115,9 +121,16 @@
 		refreshing = true;
 
 		cacheMods(await api.thunderstore.query({ ...modQuery.current, maxCount }));
-		if (selectedMod) {
-			// isInstalled might have changed
-			selectedMod = findItemByUuid(itemUuid(selectedMod));
+		if (cachedSelectedKey) {
+			const found = findItemByUuid(cachedSelectedKey);
+
+			if (found) {
+				// isInstalled might have changed
+				selectedMod = found;
+			} else if (selectedMod) {
+				selectedMod = null;
+				cachedSelectedKey = null;
+			}
 		}
 
 		refreshing = false;
@@ -155,8 +168,10 @@
 			installLatest(mod);
 		} else if (selectedMod && itemUuid(selectedMod) === mod.uuid) {
 			selectedMod = null;
+			cachedSelectedKey = null;
 		} else {
 			selectedMod = findItemByUuid(mod.uuid);
+			cachedSelectedKey = selectedMod ? (itemUuid(selectedMod) ?? null) : null;
 		}
 	}
 
@@ -223,7 +238,10 @@
 			{locked}
 			mod={selectedMod.data}
 			{contextItems}
-			onclose={() => (selectedMod = null)}
+			onclose={() => {
+				selectedMod = null;
+				cachedSelectedKey = null;
+			}}
 		>
 			{#snippet children({ mod })}
 				<InstallModButton {mod} isInstalled={selectedMod?.isInstalled} {install} {locked} />

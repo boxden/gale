@@ -20,7 +20,7 @@
 	import { DropdownMenu } from 'bits-ui';
 
 	import Icon from '@iconify/svelte';
-	import { type Snippet } from 'svelte';
+	import { untrack, type Snippet } from 'svelte';
 	import { m } from '$lib/paraglide/messages';
 	import config from '$lib/state/config.svelte';
 	import InfoBox from '../ui/InfoBox.svelte';
@@ -86,8 +86,14 @@
 		changelogPromise = getMarkdown(mod, 'changelog', true);
 	}
 
+	// key on readme identity so a list refresh re-resolving the mod doesn't refetch and collapse the restored scroll
+	const readmeKey = $derived(`${mod.type}:${mod.backend}:${mod.uuid}:${mod.versionUuid}`);
 	$effect(() => {
-		readmePromise = getMarkdown(mod, 'readme');
+		readmeKey;
+		readmePromise = getMarkdown(
+			untrack(() => mod),
+			'readme'
+		);
 	});
 </script>
 
