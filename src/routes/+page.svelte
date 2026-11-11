@@ -294,7 +294,7 @@
 
 		{#if mods.length === 0 && hasRefreshed}
 			{#if totalModCount === 0}
-				<HelpCard icon="ph:ghost" title={m.page_modList_noMods_1()}>
+				<HelpCard class="grow" icon="ph:ghost" title={m.page_modList_noMods_1()}>
 					<a
 						href="/browse"
 						class="text-accent-600 hover:text-accent-700 dark:text-accent-400 dark:hover:text-accent-300 hover:underline"
