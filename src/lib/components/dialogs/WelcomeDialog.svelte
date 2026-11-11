@@ -12,8 +12,10 @@
 	import ColorPref from '../prefs/ColorPref.svelte';
 	import { invoke } from '@tauri-apps/api/core';
 	import { m } from '$lib/paraglide/messages';
-	import { accentColorSetting, primaryColorSetting } from '$lib/state/theme.svelte';
+	import { accentColorSetting, darkMode, primaryColorSetting } from '$lib/state/theme.svelte';
 	import ColorPrefs from '../prefs/ColorPrefs.svelte';
+	import Checkbox from '$lib/components/ui/Checkbox.svelte';
+	import Label from '$lib/components/ui/Label.svelte';
 
 	type Props = {
 		open?: boolean;
@@ -106,6 +108,18 @@
 					</PathPref>
 
 					<ColorPrefs />
+
+					<div class="flex items-center">
+						<Label>{m.prefs_appearance_darkMode_title()}</Label>
+
+						<Checkbox
+							class="ml-8"
+							checked={darkMode.current}
+							onCheckedChange={(value) => {
+								darkMode.current = value;
+							}}
+						/>
+					</div>
 				{/if}
 			</div>
 
