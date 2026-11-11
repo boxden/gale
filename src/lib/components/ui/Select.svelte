@@ -55,7 +55,7 @@
 	);
 </script>
 
-<Select.Root bind:value={value as never} bind:open {...restProps}>
+<Select.Root bind:value={value as never} bind:open scrollAlignment="center" {...restProps}>
 	<Select.Trigger
 		class={[
 			triggerClass,
