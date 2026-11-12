@@ -145,7 +145,7 @@
 					class="text-accent-600 hover:text-accent-700 dark:text-accent-400 hover:underline"
 				>
 					{m.welcomeDialog_content_end_3()}
-				</a>.
+				</a>
 			</p>
 		{/if}
 	</div>
