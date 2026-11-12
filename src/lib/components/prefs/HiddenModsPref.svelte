@@ -1,9 +1,3 @@
-<script module lang="ts">
-	import type { Dependant } from '$lib/types';
-
-	let cachedHiddenMods: Dependant[] | null = null;
-</script>
-
 <script lang="ts">
 	import Info from '$lib/components/ui/Info.svelte';
 	import Label from '$lib/components/ui/Label.svelte';
@@ -17,26 +11,27 @@
 	import ResetButton from '../ui/ResetButton.svelte';
 	import { confirm } from '@tauri-apps/plugin-dialog';
 	import { pushInfoToast } from '$lib/toast';
+	import { cachedHiddenMods, refreshHiddenMods, setHiddenMods } from '$lib/state/prefs-checks';
+	import type { Dependant } from '$lib/types';
 
 	type Props = {};
 
 	let {}: Props = $props();
 
-	let hiddenMods: Dependant[] | null = $state(cachedHiddenMods);
+	let hiddenMods: Dependant[] | null = $state(cachedHiddenMods());
 	let hiddenModCount = $derived(hiddenMods?.length ?? 0);
 	let hasHiddenMods = $derived(hiddenModCount > 0);
 
 	let dialogOpen = $state(false);
 
 	onMount(async () => {
-		hiddenMods = await api.profile.getHiddenMods();
-		cachedHiddenMods = hiddenMods;
+		hiddenMods = await refreshHiddenMods();
 	});
 
 	async function unHideMod(mod: Dependant) {
 		await api.profile.toggleHiddenMod(mod.uuid);
 		hiddenMods = (hiddenMods ?? []).filter((other) => other.uuid !== mod.uuid);
-		cachedHiddenMods = hiddenMods;
+		setHiddenMods(hiddenMods);
 
 		if (hiddenMods.length === 0) {
 			dialogOpen = false;
@@ -61,7 +56,7 @@
 		}
 
 		hiddenMods = [];
-		cachedHiddenMods = hiddenMods;
+		setHiddenMods(hiddenMods);
 
 		pushInfoToast({
 			message: m.hiddenModsPref_reset_toast({ count })
@@ -88,6 +83,8 @@
 				{m.hiddenModsPref_button_content({ count: hiddenModCount })}
 			{:else if hiddenMods !== null}
 				{m.hiddenModsPref_button_content_empty()}
+			{:else}
+				{'\u200b'}
 			{/if}
 		</div>
 	</button>

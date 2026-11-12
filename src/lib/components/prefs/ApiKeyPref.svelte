@@ -1,17 +1,11 @@
-<script module lang="ts">
-	import type { Backend } from '$lib/types';
-
-	const knownTokenStates = new Map<Backend, boolean>();
-</script>
-
 <script lang="ts">
 	import Info from '$lib/components/ui/Info.svelte';
 	import Label from '$lib/components/ui/Label.svelte';
-	import * as api from '$lib/api';
 	import Icon from '@iconify/svelte';
-	import type { Snippet } from 'svelte';
 	import { untrack } from 'svelte';
 	import { apiKeyDialog } from '$lib/state/misc.svelte';
+	import { cachedTokenState, refreshTokenState } from '$lib/state/prefs-checks';
+	import type { Backend } from '$lib/types';
 	import { m } from '$lib/paraglide/messages';
 
 	type Props = {
@@ -20,12 +14,7 @@
 
 	let { backend }: Props = $props();
 
-	let hasToken: boolean | null = $state(untrack(() => knownTokenStates.get(backend) ?? null));
-
-	async function refresh() {
-		hasToken = await api.thunderstore.hasToken(backend);
-		knownTokenStates.set(backend, hasToken);
-	}
+	let hasToken: boolean | null = $state(untrack(() => cachedTokenState(backend)));
 
 	function openDialog() {
 		apiKeyDialog.open = true;
@@ -35,7 +24,9 @@
 	$effect(() => {
 		apiKeyDialog.open;
 		apiKeyDialog.backend;
-		refresh();
+		refreshTokenState(backend)
+			.then((state) => (hasToken = state))
+			.catch(() => {});
 	});
 </script>
 
@@ -60,9 +51,7 @@
 		<div
 			class="text-primary-600 group-hover:text-primary-700 dark:text-primary-300 dark:group-hover:text-primary-200 truncate"
 		>
-			{#if hasToken !== null}
-				{m[`apiKeyPref_hasToken_${hasToken ? 'has' : 'no'}`]()}
-			{/if}
+			{hasToken === null ? '\u200b' : m[`apiKeyPref_hasToken_${hasToken ? 'has' : 'no'}`]()}
 		</div>
 	</button>
 </div>

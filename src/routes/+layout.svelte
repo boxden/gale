@@ -13,6 +13,8 @@
 	import WelcomeDialog from '$lib/components/dialogs/WelcomeDialog.svelte';
 	import Navbar from '$lib/components/misc/Navbar.svelte';
 	import profiles from '$lib/state/profile.svelte';
+	import '$lib/state/prefs.svelte';
+	import '$lib/state/prefs-checks';
 	import { updateBanner } from '$lib/state/misc.svelte';
 	import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event';
 	import { invoke } from '$lib/invoke';
