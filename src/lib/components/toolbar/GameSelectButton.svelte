@@ -19,11 +19,11 @@
 	onclick={() => (gamesOpen = !gamesOpen)}
 	class="group text-primary-700 group-hover:text-primary-800 dark:text-primary-300 dark:group-hover:text-primary-200 dark:hover:bg-primary-800 hover:bg-primary-200 flex shrink-0 items-center rounded-lg px-2 py-1 font-semibold"
 >
-	<img
-		src={games.active ? gameIconSrc(games.active) : ''}
-		class="mr-2 size-8 rounded"
-		alt={games.active?.name}
-	/>
+	{#if games.active}
+		<img src={gameIconSrc(games.active)} class="mr-2 size-8 rounded" alt={games.active.name} />
+	{:else}
+		<div class="mr-2 size-8 rounded"></div>
+	{/if}
 
 	<div class="mr-4 hidden md:block">{games.active?.name}</div>
 

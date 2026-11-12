@@ -1,3 +1,9 @@
+<script module lang="ts">
+	import type { Dependant } from '$lib/types';
+
+	let cachedHiddenMods: Dependant[] | null = null;
+</script>
+
 <script lang="ts">
 	import Info from '$lib/components/ui/Info.svelte';
 	import Label from '$lib/components/ui/Label.svelte';
@@ -5,7 +11,6 @@
 	import { m } from '$lib/paraglide/messages';
 	import Dialog from '../ui/Dialog.svelte';
 	import Icon from '@iconify/svelte';
-	import type { Dependant } from '$lib/types';
 	import { onMount } from 'svelte';
 	import ModCardList from '../ui/ModCardList.svelte';
 	import IconButton from '../ui/IconButton.svelte';
@@ -17,18 +22,21 @@
 
 	let {}: Props = $props();
 
-	let hiddenMods: Dependant[] = $state([]);
-	let hasHiddenMods = $derived(hiddenMods.length > 0);
+	let hiddenMods: Dependant[] | null = $state(cachedHiddenMods);
+	let hiddenModCount = $derived(hiddenMods?.length ?? 0);
+	let hasHiddenMods = $derived(hiddenModCount > 0);
 
 	let dialogOpen = $state(false);
 
 	onMount(async () => {
 		hiddenMods = await api.profile.getHiddenMods();
+		cachedHiddenMods = hiddenMods;
 	});
 
 	async function unHideMod(mod: Dependant) {
 		await api.profile.toggleHiddenMod(mod.uuid);
-		hiddenMods = hiddenMods.filter((other) => other.uuid !== mod.uuid);
+		hiddenMods = (hiddenMods ?? []).filter((other) => other.uuid !== mod.uuid);
+		cachedHiddenMods = hiddenMods;
 
 		if (hiddenMods.length === 0) {
 			dialogOpen = false;
@@ -36,6 +44,10 @@
 	}
 
 	async function onResetClicked() {
+		if (hiddenMods === null) {
+			return;
+		}
+
 		const confirmed = await confirm(m.hiddenModsPref_reset_message({ count: hiddenMods.length }));
 
 		if (!confirmed) {
@@ -49,6 +61,7 @@
 		}
 
 		hiddenMods = [];
+		cachedHiddenMods = hiddenMods;
 
 		pushInfoToast({
 			message: m.hiddenModsPref_reset_toast({ count })
@@ -72,8 +85,8 @@
 
 		<div class="truncate">
 			{#if hasHiddenMods}
-				{m.hiddenModsPref_button_content({ count: hiddenMods.length })}
-			{:else}
+				{m.hiddenModsPref_button_content({ count: hiddenModCount })}
+			{:else if hiddenMods !== null}
 				{m.hiddenModsPref_button_content_empty()}
 			{/if}
 		</div>
@@ -85,7 +98,11 @@
 </div>
 
 <Dialog bind:open={dialogOpen} title="Hidden Mods">
-	<ModCardList class="my-2 max-h-[50vh] overflow-y-auto" mods={hiddenMods} showVersion={false}>
+	<ModCardList
+		class="my-2 max-h-[50vh] overflow-y-auto"
+		mods={hiddenMods ?? []}
+		showVersion={false}
+	>
 		{#snippet cardChildren({ mod })}
 			<br />
 			<IconButton

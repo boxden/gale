@@ -20,9 +20,9 @@
 
 	let versionsOpen = $state(false);
 	let downloadSize: number | null = $state(null);
-	let isInstalling = $state(false);
+	let isInstalling: boolean | null = $state(null);
 
-	let disabled = $derived(isInstalled || locked || isInstalling);
+	let disabled = $derived(isInstalled || locked || isInstalling !== false);
 
 	let modId = $derived({
 		packageUuid: mod.uuid,
@@ -55,39 +55,41 @@
 </script>
 
 <div class="mt-2 flex text-lg text-white">
-	<button
-		class="enabled:bg-accent-600 enabled:hover:bg-accent-500 dark:enabled:bg-accent-700 disabled:bg-primary-300 dark:enabled:hover:bg-accent-600 dark:disabled:bg-primary-700 dark:disabled:text-primary-300 flex grow items-center justify-center gap-2 rounded-l-lg py-2 font-semibold disabled:cursor-not-allowed"
-		onclick={() => doInstall(modId)}
-		{disabled}
-	>
-		{#if locked}
-			{m.installModButton_button_locked()}
-		{:else if isInstalling}
-			<Spinner />
-
-			{m.installModButton_button_loading()}
-		{:else if isInstalled}
-			{m.installModButton_button_isInstalled()}
-		{:else}
-			<Icon icon="mdi:download" class="align-middle text-xl" />
-			{m.installModButton_button_install()}
-
-			{#if downloadSize}
-				({shortenFileSize(downloadSize)})
-			{/if}
-		{/if}
-	</button>
-	<DropdownMenu.Root bind:open={versionsOpen}>
-		<DropdownMenu.Trigger
-			class="enabled:bg-accent-600 enabled:hover:bg-accent-500 dark:enabled:bg-accent-700 dark:enabled:hover:bg-accent-600 disabled:bg-primary-300 dark:disabled:bg-primary-700 dark:disabled:text-primary-300 ml-0.5 gap-2 rounded-r-lg px-1.5 py-2 text-2xl disabled:cursor-not-allowed"
+	{#if isInstalling !== null}
+		<button
+			class="enabled:bg-accent-600 enabled:hover:bg-accent-500 dark:enabled:bg-accent-700 disabled:bg-primary-300 dark:enabled:hover:bg-accent-600 dark:disabled:bg-primary-700 dark:disabled:text-primary-300 flex grow items-center justify-center gap-2 rounded-l-lg py-2 font-semibold disabled:cursor-not-allowed"
+			onclick={() => doInstall(modId)}
 			{disabled}
 		>
-			<DropdownArrow open={versionsOpen} class="text-white" />
-		</DropdownMenu.Trigger>
-		<ContextMenuContent
-			type="dropdown"
-			items={contextItems}
-			class="max-h-90 overflow-y-auto text-base"
-		/>
-	</DropdownMenu.Root>
+			{#if locked}
+				{m.installModButton_button_locked()}
+			{:else if isInstalling === true}
+				<Spinner />
+
+				{m.installModButton_button_loading()}
+			{:else if isInstalled}
+				{m.installModButton_button_isInstalled()}
+			{:else}
+				<Icon icon="mdi:download" class="align-middle text-xl" />
+				{m.installModButton_button_install()}
+
+				{#if downloadSize}
+					({shortenFileSize(downloadSize)})
+				{/if}
+			{/if}
+		</button>
+		<DropdownMenu.Root bind:open={versionsOpen}>
+			<DropdownMenu.Trigger
+				class="enabled:bg-accent-600 enabled:hover:bg-accent-500 dark:enabled:bg-accent-700 dark:enabled:hover:bg-accent-600 disabled:bg-primary-300 dark:disabled:bg-primary-700 dark:disabled:text-primary-300 ml-0.5 gap-2 rounded-r-lg px-1.5 py-2 text-2xl disabled:cursor-not-allowed"
+				{disabled}
+			>
+				<DropdownArrow open={versionsOpen} class="text-white" />
+			</DropdownMenu.Trigger>
+			<ContextMenuContent
+				type="dropdown"
+				items={contextItems}
+				class="max-h-90 overflow-y-auto text-base"
+			/>
+		</DropdownMenu.Root>
+	{/if}
 </div>

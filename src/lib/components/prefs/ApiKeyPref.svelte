@@ -1,12 +1,18 @@
+<script module lang="ts">
+	import type { Backend } from '$lib/types';
+
+	const knownTokenStates = new Map<Backend, boolean>();
+</script>
+
 <script lang="ts">
 	import Info from '$lib/components/ui/Info.svelte';
 	import Label from '$lib/components/ui/Label.svelte';
 	import * as api from '$lib/api';
 	import Icon from '@iconify/svelte';
 	import type { Snippet } from 'svelte';
+	import { untrack } from 'svelte';
 	import { apiKeyDialog } from '$lib/state/misc.svelte';
 	import { m } from '$lib/paraglide/messages';
-	import type { Backend } from '$lib/types';
 
 	type Props = {
 		backend: Backend;
@@ -14,10 +20,11 @@
 
 	let { backend }: Props = $props();
 
-	let hasToken = $state(false);
+	let hasToken: boolean | null = $state(untrack(() => knownTokenStates.get(backend) ?? null));
 
 	async function refresh() {
 		hasToken = await api.thunderstore.hasToken(backend);
+		knownTokenStates.set(backend, hasToken);
 	}
 
 	function openDialog() {
@@ -45,7 +52,7 @@
 	>
 		<div class="mr-2 rounded-sm">
 			<Icon
-				icon={hasToken ? 'mdi:key' : 'mdi:key-remove'}
+				icon={hasToken === false ? 'mdi:key-remove' : 'mdi:key'}
 				class="text-primary-600 group-hover:text-primary-700 dark:text-primary-300 dark:group-hover:text-primary-200 align-middle"
 			/>
 		</div>
@@ -53,7 +60,9 @@
 		<div
 			class="text-primary-600 group-hover:text-primary-700 dark:text-primary-300 dark:group-hover:text-primary-200 truncate"
 		>
-			{m[`apiKeyPref_hasToken_${hasToken ? 'has' : 'no'}`]()}
+			{#if hasToken !== null}
+				{m[`apiKeyPref_hasToken_${hasToken ? 'has' : 'no'}`]()}
+			{/if}
 		</div>
 	</button>
 </div>

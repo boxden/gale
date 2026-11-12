@@ -22,11 +22,13 @@
 			{profiles.active?.name}
 		</span>
 
-		<div
-			class="dark:bg-primary-800 dark:group-hover:bg-primary-700 bg-primary-200 group-hover:bg-primary-300 mr-2 ml-6 rounded-sm px-1.5 py-1 text-xs font-medium"
-		>
-			{profiles.active?.modCount}
-		</div>
+		{#if profiles.active}
+			<div
+				class="dark:bg-primary-800 dark:group-hover:bg-primary-700 bg-primary-200 group-hover:bg-primary-300 mr-2 ml-6 rounded-sm px-1.5 py-1 text-xs font-medium"
+			>
+				{profiles.active.modCount}
+			</div>
+		{/if}
 
 		<DropdownArrow {open} />
 	</DropdownMenu.Trigger>
