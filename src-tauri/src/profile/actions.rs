@@ -348,6 +348,46 @@ impl ManagedGame {
         Ok(())
     }
 
+    /// Adds the profile that stands in for a game the user has not selected
+    /// yet: it exists in memory only, with id 0 so it is never persisted.
+    pub fn add_placeholder_profile(&mut self) {
+        let profile = Profile {
+            id: 0,
+            name: "Default".to_owned(),
+            path: self.path.join("profiles").join("Default"),
+            mods: Vec::new(),
+            game: self.game,
+            ignored_version_updates: HashSet::new(),
+            ignored_package_updates: HashSet::new(),
+            config_cache: ConfigCache::default(),
+            linked_config: HashMap::new(),
+            modpack: None,
+            sync: None,
+            custom_args: String::new(),
+            missing: false,
+            excluded_export_files: HashSet::new(),
+        };
+
+        self.profiles.push(profile);
+        self.active_profile_id = 0;
+    }
+
+    /// Turns a placeholder into a real default profile on disk.
+    pub fn materialize(&mut self, db: &Db) -> Result<()> {
+        if self.materialized {
+            return Ok(());
+        }
+
+        self.profiles.retain(|profile| profile.id != 0);
+
+        if self.profiles.is_empty() {
+            self.create_default_profile(db)?;
+        }
+
+        self.materialized = true;
+        Ok(())
+    }
+
     pub fn forget_profile(&mut self, id: i64, db: &Db) -> Result<()> {
         let index = self.index_of(id).expect("profile must exist");
 

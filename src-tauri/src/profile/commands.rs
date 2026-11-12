@@ -88,7 +88,9 @@ pub fn favorite_game(slug: String, app: AppHandle) -> Result<()> {
     let managed_game = manager.ensure_game(game, false, &prefs, app.db())?;
     managed_game.favorite = !managed_game.favorite;
 
-    managed_game.save(&app)?;
+    // the favorited game may not be the active one, so its profiles must not
+    // be broadcast as the active game's
+    app.db().save_game(managed_game)?;
 
     Ok(())
 }

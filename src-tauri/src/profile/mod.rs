@@ -6,7 +6,7 @@ use std::{
 
 use chrono::{DateTime, Utc};
 use export::modpack::ModpackArgs;
-use eyre::{Context, ContextCompat, OptionExt, Result, anyhow, ensure, eyre};
+use eyre::{ContextCompat, OptionExt, Result, anyhow, ensure, eyre};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
@@ -61,6 +61,10 @@ pub struct ManagedGame {
     pub profiles: Vec<Profile>,
     pub favorite: bool,
     pub active_profile_id: i64,
+    /// Whether the profiles exist on disk. A game that the user has never
+    /// selected only has an in-memory placeholder profile, so a first launch
+    /// does not create an empty directory for the default game.
+    pub materialized: bool,
 }
 
 #[derive(Debug)]
@@ -562,10 +566,15 @@ impl ModManager {
             profiles,
         } = data;
 
-        let active_game = manager
+        let saved_active_game = manager
             .active_game_slug
-            .and_then(|slug| game::from_slug(&slug))
-            .unwrap_or_else(|| game::from_slug(DEFAULT_GAME_SLUG).unwrap());
+            .as_deref()
+            .and_then(game::from_slug);
+
+        let has_saved_active_game = saved_active_game.is_some();
+
+        let active_game =
+            saved_active_game.unwrap_or_else(|| game::from_slug(DEFAULT_GAME_SLUG).unwrap());
 
         let mut manager = Self {
             active_game,
@@ -623,7 +632,24 @@ impl ModManager {
                 .push(profile);
         }
 
-        manager.ensure_game(manager.active_game, true, prefs, db)?;
+        for game in manager.games.values_mut() {
+            game.profiles.retain(|profile| profile.id != 0);
+
+            if !game.profiles.is_empty() {
+                game.materialized = true;
+
+                if game.profile(game.active_profile_id).is_err() {
+                    game.active_profile_id = game.profiles[0].id;
+                }
+            }
+        }
+
+        manager.ensure_game(manager.active_game, has_saved_active_game, prefs, db)?;
+
+        if manager.active_game().profiles.is_empty() {
+            manager.active_game_mut().add_placeholder_profile();
+        }
+
         db.save_all(&manager)?;
 
         Ok(manager)
@@ -687,12 +713,12 @@ impl ModManager {
     fn ensure_game<'a>(
         &'a mut self,
         game: Game,
-        verify_profiles: bool,
+        materialize: bool,
         prefs: &Prefs,
         db: &Db,
     ) -> Result<&'a mut ManagedGame> {
         if !self.games.contains_key(game) {
-            self.manage_game(game, prefs, db)?;
+            self.manage_game(game, prefs, db, materialize)?;
         }
 
         let managed = self
@@ -700,22 +726,21 @@ impl ModManager {
             .get_mut(game)
             .expect("newly managed game not found");
 
-        if verify_profiles && managed.profile(managed.active_profile_id).is_err() {
-            if managed.profiles.is_empty() {
-                warn!("game {} has no profiles", game.slug);
-                managed.create_default_profile(db).with_context(|| {
-                    format!("failed to create default profile for {}", game.slug)
-                })?;
-            } else {
-                warn!("active profile was out of bounds");
-                managed.active_profile_id = managed.profiles[0].id;
-            }
+        if !materialize {
+            return Ok(managed);
+        }
+
+        managed.materialize(db)?;
+
+        if managed.profile(managed.active_profile_id).is_err() {
+            warn!("game {} has no valid active profile", game.slug);
+            managed.active_profile_id = managed.profiles[0].id;
         }
 
         Ok(managed)
     }
 
-    fn manage_game(&mut self, game: Game, prefs: &Prefs, db: &Db) -> Result<()> {
+    fn manage_game(&mut self, game: Game, prefs: &Prefs, db: &Db, materialize: bool) -> Result<()> {
         info!("managing new game: {}", game.slug);
 
         let path = prefs.data_dir.join(&*game.slug);
@@ -728,13 +753,17 @@ impl ModManager {
             profiles: Vec::new(),
             favorite: false,
             active_profile_id: 0,
+            materialized: false,
         };
 
-        if let Err(err) = managed.create_default_profile(db) {
-            warn!(
-                "failed to create default profile for {}: {:#}",
-                game.slug, err
-            );
+        if materialize {
+            match managed.create_default_profile(db) {
+                Ok(()) => managed.materialized = true,
+                Err(err) => warn!(
+                    "failed to create default profile for {}: {:#}",
+                    game.slug, err
+                ),
+            }
         }
 
         self.games.insert(game, managed);
@@ -768,6 +797,7 @@ impl ModManager {
             favorite: saved_game.favorite,
             active_profile_id: saved_game.active_profile_id,
             path: base_path.join(&*game.slug),
+            materialized: false,
         };
 
         self.games.insert(game, managed_game);

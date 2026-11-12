@@ -68,6 +68,18 @@ impl Cli {
             vanilla,
         } = self;
 
+        let needs_active_game = install.is_some() || launch || profile.is_some();
+
+        if game.is_none() && needs_active_game {
+            // the active game is only a placeholder until it is selected, so
+            // make it real before an action writes into its profile directory
+            let active = manager.active_game;
+            manager
+                .set_active_game(active, app)
+                .context("failed to prepare the active game")?;
+            manager.save_all(app)?;
+        }
+
         if let Some(slug) = &game {
             let game = game::from_slug(slug).ok_or_eyre("unknown game slug")?;
 

@@ -334,12 +334,20 @@ impl Db {
     }
 
     fn _save_manager(&self, tx: &rusqlite::Transaction, manager: &ModManager) -> Result<()> {
+        // the fallback game is only a placeholder until the user selects it,
+        // so it must not stick as the saved active game
+        let active_slug = manager
+            .games
+            .get(&manager.active_game)
+            .filter(|game| game.materialized)
+            .map(|game| game.game.slug.as_ref());
+
         tx.execute(
             "INSERT OR REPLACE INTO manager (id, active_game_slug, hidden_mods)
             VALUES (?, ?, ?)",
             params![
                 1,
-                manager.active_game.slug,
+                active_slug,
                 serde_json::to_string(&manager.hidden_mods)?
             ],
         )?;
@@ -361,7 +369,7 @@ impl Db {
                 VALUES (?, ?, ?, ?)",
         )?;
 
-        for game in games {
+        for game in games.filter(|game| game.materialized || game.favorite) {
             stmt.execute(params![
                 game.id,
                 game.game.slug,
@@ -382,6 +390,7 @@ impl Db {
         tx: &rusqlite::Transaction,
         profiles: impl Iterator<Item = &'a Profile>,
     ) -> Result<()> {
+        // id 0 marks a placeholder for a game that has not been selected yet
         let mut stmt = tx.prepare(
             "INSERT OR REPLACE INTO profiles 
                 (
@@ -400,7 +409,7 @@ impl Db {
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )?;
 
-        for profile in profiles {
+        for profile in profiles.filter(|profile| profile.id != 0) {
             let mods = serde_json::to_string(&profile.mods)?;
             let modpack = profile
                 .modpack
