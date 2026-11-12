@@ -20,7 +20,11 @@
 use std::{
     fmt::{Debug, Display},
     iter, process,
-    sync::atomic::{AtomicBool, Ordering},
+    sync::{
+        Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::{Duration, Instant},
 };
 
 use chrono::{DateTime, Utc};
@@ -367,7 +371,50 @@ impl<'a> InstallEvent<'a> {
     }
 }
 
+/// Byte-level download progress is emitted every 100ms per download, which
+/// floods the webview with evals during large installs. Coalesce it to a few
+/// events per second; skipped bytes accumulate into the next emitted event.
+const BYTE_PROGRESS_INTERVAL: Duration = Duration::from_millis(200);
+
+struct ByteProgress {
+    last: Option<Instant>,
+    pending: i64,
+}
+
+static BYTE_PROGRESS: Mutex<ByteProgress> = Mutex::new(ByteProgress {
+    last: None,
+    pending: 0,
+});
+
 fn emit(event: InstallEvent, app: &AppHandle) {
+    if let InstallEvent::AddProgress { mods: 0, bytes } = event {
+        let mut state = BYTE_PROGRESS.lock().unwrap();
+        state.pending += bytes;
+
+        if state.last.is_some_and(|last| last.elapsed() < BYTE_PROGRESS_INTERVAL) {
+            return;
+        }
+
+        state.last = Some(Instant::now());
+        let event = InstallEvent::AddProgress {
+            mods: 0,
+            bytes: std::mem::take(&mut state.pending),
+        };
+        drop(state);
+
+        app.emit_buffered("install_event", &event);
+        return;
+    }
+
+    // flush accumulated byte progress first so events stay ordered
+    let pending = std::mem::take(&mut BYTE_PROGRESS.lock().unwrap().pending);
+    if pending != 0 {
+        app.emit_buffered(
+            "install_event",
+            &InstallEvent::AddProgress { mods: 0, bytes: pending },
+        );
+    }
+
     app.emit_buffered("install_event", &event);
 }
 
