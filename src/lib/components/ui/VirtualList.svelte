@@ -430,6 +430,7 @@
 		if (scrollRaf !== 0) cancelAnimationFrame(scrollRaf);
 		if (restoreTimer !== undefined) clearTimeout(restoreTimer);
 		if (settleTimer !== undefined) clearTimeout(settleTimer);
+		if (refreshTimer !== undefined) clearTimeout(refreshTimer);
 		// no final write here: the DOM has already collapsed by the time
 		// onDestroy runs, so scrollTop reads 0 and would clobber the saved
 		// position. saveAnchor keeps the map fresh while scrolling instead.
@@ -443,6 +444,8 @@
 	let refreshItemHeight: number | undefined;
 	let refreshing = false;
 	let refreshPending = false;
+	let lastRefreshAt = 0;
+	let refreshTimer: ReturnType<typeof setTimeout> | undefined;
 
 	async function refreshNext() {
 		if (refreshing) {
@@ -461,12 +464,41 @@
 		}
 	}
 
-	// whenever `items` or the viewport size changes, invalidate the heightmap
+	// each refresh measures the DOM, so height-driven refreshes are capped at
+	// ~10fps with a trailing run — the list stays correct once the resize
+	// settles instead of forcing layout on every frame
+	function scheduleRefresh() {
+		const wait = 100 - (performance.now() - lastRefreshAt);
+		if (wait <= 0) {
+			lastRefreshAt = performance.now();
+			void refreshNext();
+			return;
+		}
+
+		refreshTimer ??= setTimeout(() => {
+			refreshTimer = undefined;
+			lastRefreshAt = performance.now();
+			void refreshNext();
+		}, wait);
+	}
+
+	// whenever `items` or the fixed item height changes, refresh immediately
 	run(() => {
 		refreshItems = items;
-		refreshHeight = viewportHeight;
 		refreshItemHeight = itemHeight;
-		if (mounted) void refreshNext();
+		if (mounted) {
+			lastRefreshAt = performance.now();
+			if (refreshTimer !== undefined) {
+				clearTimeout(refreshTimer);
+				refreshTimer = undefined;
+			}
+			void refreshNext();
+		}
+	});
+
+	run(() => {
+		refreshHeight = viewportHeight;
+		if (mounted) scheduleRefresh();
 	});
 </script>
 
