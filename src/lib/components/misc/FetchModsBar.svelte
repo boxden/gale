@@ -49,7 +49,7 @@
 
 {#if backendsFetching.size > 0}
 	<div
-		class="text-primary-500 border-primary-200 dark:text-primary-400 dark:bg-primary-900 dark:border-primary-800 bg100 absolute inset-x-0 bottom-0 z-20 flex items-center border-t px-4 py-2 text-sm"
+		class="text-primary-500 border-primary-200 dark:text-primary-400 dark:bg-primary-900 dark:border-primary-800 bg-primary-100 absolute inset-x-0 bottom-0 z-20 flex items-center border-t px-4 py-2 text-sm"
 		transition:slide={{ duration: 50, easing: expoOut }}
 	>
 		<Spinner />
