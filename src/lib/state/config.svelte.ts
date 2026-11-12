@@ -9,6 +9,7 @@ class ConfigState {
 	selectedFile: ConfigFile | null = $state(null);
 	selectedSection: ConfigSection | null = $state(null);
 	loading = $state(false);
+	hasLoaded = $state(false);
 
 	constructor() {
 		$effect.root(() => {
@@ -34,6 +35,8 @@ class ConfigState {
 			if (this.selectedFile && this.selectedSection) {
 				this.selectedSection = this.findSectionByName(this.selectedFile, this.selectedSection.name);
 			}
+
+			this.hasLoaded = true;
 		} finally {
 			this.loading = false;
 		}

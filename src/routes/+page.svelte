@@ -276,93 +276,95 @@
 </script>
 
 <div class="flex grow overflow-hidden">
-	<div class="flex w-[60%] grow flex-col overflow-hidden px-4 pt-4">
-		<ModListFilters {sortOptions} bind:queryArgs={profileQuery.current} />
+	{#if hasRefreshed && totalModCount === 0}
+		<div class="grid w-full grid-rows-[1fr_auto_1fr] justify-items-center select-none">
+			<HelpCard class="row-start-2" icon="ph:ghost" title={m.page_modList_noMods_1()} />
 
-		{#if locked}
-			<ProfileLockedBanner class="mb-1" />
-		{:else}
-			<UpdateAllBanner updates={updates.values().toArray()} />
-		{/if}
+			<a
+				href="/browse"
+				class="text-accent-600 hover:text-accent-700 dark:text-accent-400 dark:hover:text-accent-300 row-start-3 self-start hover:underline"
+				><Icon
+					icon="mdi:store-search"
+					class="mr-0.5 ml-1  inline"
+					inline
+				/>{m.page_modList_noMods_2()}</a
+			>
+		</div>
+	{:else if hasRefreshed}
+		<div class="flex w-[60%] grow flex-col overflow-hidden px-4 pt-4">
+			<ModListFilters {sortOptions} bind:queryArgs={profileQuery.current} />
 
-		{#if unknownMods.length > 0 && !locked}
-			<UnknownModsBanner
-				mods={unknownMods}
-				onUninstall={() => forceUninstall(...unknownMods.map((uuid) => uuid.uuid))}
-			/>
-		{/if}
-
-		{#if mods.length === 0 && hasRefreshed}
-			{#if totalModCount === 0}
-				<HelpCard class="grow" icon="ph:ghost" title={m.page_modList_noMods_1()}>
-					<a
-						href="/browse"
-						class="text-accent-600 hover:text-accent-700 dark:text-accent-400 dark:hover:text-accent-300 hover:underline"
-						><Icon
-							icon="mdi:store-search"
-							class="mr-0.5 ml-1  inline"
-							inline
-						/>{m.page_modList_noMods_2()}</a
-					>
-				</HelpCard>
+			{#if locked}
+				<ProfileLockedBanner class="mb-1" />
 			{:else}
+				<UpdateAllBanner updates={updates.values().toArray()} />
+			{/if}
+
+			{#if unknownMods.length > 0 && !locked}
+				<UnknownModsBanner
+					mods={unknownMods}
+					onUninstall={() => forceUninstall(...unknownMods.map((uuid) => uuid.uuid))}
+				/>
+			{/if}
+
+			{#if mods.length === 0 && hasRefreshed}
 				<HelpCard class="mt-4" title={m.page_modList_noResults_1()} icon="mdi:magnify">
 					{m.page_modList_noResults_2()}
 				</HelpCard>
+			{:else}
+				<ReorderableList bind:items {onmove} {reorderable} scrollKey="profile-mods">
+					{#snippet mod({ mod, index })}
+						<ProfileModListItem
+							{mod}
+							{index}
+							{locked}
+							{contextItems}
+							update={updates.get(mod.data.uuid)}
+							selected={selectedMod?.data.uuid === mod.data.uuid}
+							ontoggle={(newState) => toggleMod(mod, newState)}
+							onclick={() => {
+								if (selectedMod?.data.uuid === mod.data.uuid) {
+									selectedMod = null;
+								} else {
+									selectedMod = mod;
+								}
+							}}
+						/>
+					{/snippet}
+				</ReorderableList>
 			{/if}
-		{:else}
-			<ReorderableList bind:items {onmove} {reorderable} scrollKey="profile-mods">
-				{#snippet mod({ mod, index })}
-					<ProfileModListItem
-						{mod}
-						{index}
-						{locked}
-						{contextItems}
-						update={updates.get(mod.data.uuid)}
-						selected={selectedMod?.data.uuid === mod.data.uuid}
-						ontoggle={(newState) => toggleMod(mod, newState)}
-						onclick={() => {
-							if (selectedMod?.data.uuid === mod.data.uuid) {
-								selectedMod = null;
+		</div>
+
+		{#if selectedMod}
+			{@const update = updates.get(selectedMod.data.uuid)}
+
+			<ModDetails
+				mod={selectedMod.data}
+				contextItems={resolveModContextItems(contextItems, selectedMod, locked)}
+				onclose={() => (selectedMod = null)}
+			>
+				{#if update && !locked}
+					{@const isPrerelease = isNonReleaseVersion(update?.new)}
+
+					<Button
+						color={isPrerelease ? 'primary' : 'accent'}
+						icon={isPrerelease ? 'mdi:flask-outline' : 'mdi:arrow-up-circle'}
+						size="lg"
+						class="mt-2"
+						onclick={async () => {
+							const prefs = await api.prefs.get();
+							if (shouldWarnForeignDownload(update.updatedId, prefs)) {
+								foreignDownloadDialogOpen = true;
 							} else {
-								selectedMod = mod;
+								updateModToLatest(selectedMod!);
 							}
 						}}
-					/>
-				{/snippet}
-			</ReorderableList>
+					>
+						{m.page_modDetails_button({ version: update.new })}
+					</Button>
+				{/if}
+			</ModDetails>
 		{/if}
-	</div>
-
-	{#if selectedMod}
-		{@const update = updates.get(selectedMod.data.uuid)}
-
-		<ModDetails
-			mod={selectedMod.data}
-			contextItems={resolveModContextItems(contextItems, selectedMod, locked)}
-			onclose={() => (selectedMod = null)}
-		>
-			{#if update && !locked}
-				{@const isPrerelease = isNonReleaseVersion(update?.new)}
-
-				<Button
-					color={isPrerelease ? 'primary' : 'accent'}
-					icon={isPrerelease ? 'mdi:flask-outline' : 'mdi:arrow-up-circle'}
-					size="lg"
-					class="mt-2"
-					onclick={async () => {
-						const prefs = await api.prefs.get();
-						if (shouldWarnForeignDownload(update.updatedId, prefs)) {
-							foreignDownloadDialogOpen = true;
-						} else {
-							updateModToLatest(selectedMod!);
-						}
-					}}
-				>
-					{m.page_modDetails_button({ version: update.new })}
-				</Button>
-			{/if}
-		</ModDetails>
 	{/if}
 </div>
 

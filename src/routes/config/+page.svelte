@@ -23,9 +23,9 @@
 	});
 </script>
 
-{#if !config.loading && config.files.length === 0}
-	<HelpCard title={m.config_noFiles()} icon="mdi:folder-open-outline" class="w-full" />
-{:else}
+{#if config.hasLoaded && config.files.length === 0}
+	<HelpCard title={m.config_noFiles()} icon="mdi:folder-open-outline" class="w-full select-none" />
+{:else if config.hasLoaded}
 	<div class="grid w-full grid-cols-[18rem_1fr] xl:grid-cols-[min(22rem)_1fr]">
 		{#if config.loading}
 			{@render loadingSkeletons()}
