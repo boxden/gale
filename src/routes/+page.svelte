@@ -1,16 +1,23 @@
+<script module lang="ts">
+	import type { AvailableUpdate, Dependant, ProfileMod } from '$lib/types';
+
+	let cachedProfileId: number | null = null;
+	let cachedMods: ProfileMod[] = [];
+	let cachedTotalModCount = 0;
+	let cachedUnknownMods: Dependant[] = [];
+	let cachedUpdates = new Map<string, AvailableUpdate>();
+</script>
+
 <script lang="ts">
 	import * as api from '$lib/api';
 	import DependantsDialog from '$lib/components/dialogs/DependantsDialog.svelte';
 	import type {
 		Mod,
-		AvailableUpdate,
-		Dependant,
 		ModContextItem,
 		SortBy,
 		DependantWithVersion,
 		ListItem,
 		Backend,
-		ProfileMod,
 		ModId
 	} from '$lib/types';
 	import {
@@ -118,12 +125,19 @@
 		)
 	]);
 
-	let mods: ProfileMod[] = $state([]);
-	let items: ListItem[] = $state([]);
-	let totalModCount = $state(0);
-	let unknownMods: Dependant[] = $state([]);
+	const initialProfileId = untrack(() => profiles.active?.id ?? null);
+	const hasCachedQuery = cachedProfileId !== null && cachedProfileId === initialProfileId;
+
+	let mods: ProfileMod[] = $state(hasCachedQuery ? cachedMods : []);
+	let items: ListItem[] = $state(
+		hasCachedQuery ? cachedMods.map((mod) => ({ type: 'mod', mod })) : []
+	);
+	let totalModCount = $state(hasCachedQuery ? cachedTotalModCount : 0);
+	let unknownMods: Dependant[] = $state(hasCachedQuery ? cachedUnknownMods : []);
 	// map from package uuids to updates
-	let updates: Map<string, AvailableUpdate> = $state(new Map());
+	let updates: Map<string, AvailableUpdate> = $state(
+		hasCachedQuery ? cachedUpdates : new Map()
+	);
 
 	let selectedMod: ProfileMod | null = $state(null);
 
@@ -136,7 +150,7 @@
 
 	let activeMod: ProfileMod | null = $state(null);
 
-	let hasRefreshed = $state(false);
+	let hasRefreshed = $state(hasCachedQuery);
 
 	let refreshPromise: Promise<void> | null = $state(null);
 
@@ -151,6 +165,7 @@
 		}
 
 		refreshPromise = (async () => {
+			const profileId = profiles.active?.id ?? null;
 			const result = await api.profile.query({ ...profileQuery.current, maxCount: null });
 
 			const updateMap = new Map(
@@ -162,6 +177,12 @@
 			totalModCount = result.totalModCount;
 			unknownMods = result.unknownMods;
 			updates = updateMap;
+
+			cachedProfileId = profileId;
+			cachedMods = mods;
+			cachedTotalModCount = totalModCount;
+			cachedUnknownMods = unknownMods;
+			cachedUpdates = updateMap;
 
 			if (selectedMod !== null) {
 				selectedMod = mods.find((mod) => mod.data.uuid === selectedMod!.data.uuid) ?? null;

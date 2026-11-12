@@ -1,3 +1,9 @@
+<script module lang="ts">
+	import type { Prefs } from '$lib/types';
+
+	let cachedPrefs: Prefs | null = null;
+</script>
+
 <script lang="ts">
 	import PathPref from '$lib/components/prefs/PathPref.svelte';
 	import LaunchModePref from '$lib/components/prefs/LaunchModePref.svelte';
@@ -10,8 +16,8 @@
 	import SmallHeading from '$lib/components/prefs/SmallHeading.svelte';
 	import PlatformPref from '$lib/components/prefs/PlatformPref.svelte';
 
-	import { Backend, Backends, type GamePrefs, type Prefs } from '$lib/types';
-	import { onMount } from 'svelte';
+	import { Backend, Backends, type GamePrefs } from '$lib/types';
+	import { onMount, untrack } from 'svelte';
 	import * as api from '$lib/api';
 
 	import { platform } from '@tauri-apps/plugin-os';
@@ -31,10 +37,12 @@
 	import ExportFilesDialog from '$lib/components/dialogs/ExportFilesDialog.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 
-	let prefs: Prefs | null = $state(null);
-	let gamePrefs: GamePrefs | null = $state(null);
-
 	let gameSlug = $derived(games.active?.slug ?? '');
+
+	let prefs: Prefs | null = $state(cachedPrefs);
+	let gamePrefs: GamePrefs | null = $state(
+		untrack(() => cachedPrefs?.gamePrefs.get(gameSlug) ?? null)
+	);
 
 	let shownPlatform = $derived.by(
 		() => gamePrefs?.platform ?? games.active?.platforms[0] ?? 'Unknown'
@@ -82,6 +90,7 @@
 	async function refresh() {
 		let newPrefs = await api.prefs.get();
 		newPrefs.gamePrefs = new Map(Object.entries(newPrefs.gamePrefs));
+		cachedPrefs = newPrefs;
 		prefs = newPrefs;
 	}
 </script>

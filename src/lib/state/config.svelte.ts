@@ -10,6 +10,7 @@ class ConfigState {
 	selectedSection: ConfigSection | null = $state(null);
 	loading = $state(false);
 	hasLoaded = $state(false);
+	loadedProfileId: number | null = $state(null);
 
 	constructor() {
 		$effect.root(() => {
@@ -24,6 +25,7 @@ class ConfigState {
 	async refresh() {
 		if (this.loading) return;
 		console.log('Refreshing config files...');
+		const profileId = profiles.active?.id ?? null;
 		this.loading = true;
 		try {
 			this.files = await api.config.getFiles();
@@ -37,6 +39,7 @@ class ConfigState {
 			}
 
 			this.hasLoaded = true;
+			this.loadedProfileId = profileId;
 		} finally {
 			this.loading = false;
 		}

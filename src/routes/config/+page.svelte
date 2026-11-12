@@ -27,7 +27,7 @@
 	<HelpCard title={m.config_noFiles()} icon="mdi:folder-open-outline" class="w-full select-none" />
 {:else if config.hasLoaded}
 	<div class="grid w-full grid-cols-[18rem_1fr] xl:grid-cols-[min(22rem)_1fr]">
-		{#if config.loading}
+		{#if config.loading && config.loadedProfileId !== (profiles.active?.id ?? null)}
 			{@render loadingSkeletons()}
 		{:else}
 			<ConfigFileList bind:searchTerm />

@@ -1,3 +1,11 @@
+<script module lang="ts">
+	import type { ModpackArgs } from '$lib/types';
+
+	let cachedProfileId: number | null = null;
+	let cachedArgs: ModpackArgs | null = null;
+	let cachedHexiumExclusive = false;
+</script>
+
 <script lang="ts">
 	import InputField from '$lib/components/ui/InputField.svelte';
 	import FormField from '$lib/components/ui/FormField.svelte';
@@ -10,7 +18,7 @@
 	import ApiKeyDialog from '$lib/components/dialogs/ApiKeyDialog.svelte';
 
 	import * as api from '$lib/api';
-	import { Backend, type ModpackArgs, type UploadSubmissionResult } from '$lib/types';
+	import { Backend, type UploadSubmissionResult } from '$lib/types';
 	import { open } from '@tauri-apps/plugin-dialog';
 
 	import Dialog from '$lib/components/ui/Dialog.svelte';
@@ -20,6 +28,7 @@
 	import { toHeaderCase } from 'js-convert-case';
 	import Spinner from '$lib/components/ui/Spinner.svelte';
 	import { SvelteMap } from 'svelte/reactivity';
+	import { untrack } from 'svelte';
 	import profiles from '$lib/state/profile.svelte';
 	import games from '$lib/state/game.svelte';
 	import { apiKeyDialog } from '$lib/state/misc.svelte';
@@ -30,25 +39,30 @@
 	const URL_PATTERN =
 		'[Hh][Tt][Tt][Pp][Ss]?://(?:(?:[a-zA-Z\u00a1-\uffff0-9]+-?)*[a-zA-Z\u00a1-\uffff0-9]+)(?:.(?:[a-zA-Z\u00a1-\uffff0-9]+-?)*[a-zA-Z\u00a1-\uffff0-9]+)*(?:.(?:[a-zA-Z\u00a1-\uffff]{2,}))(?::d{2,5})?(?:/[^s]*)?';
 
-	let name: string = $state('');
-	let author: string = $state('');
-	let selectedCategories: string[] = $state([]);
-	let nsfw: boolean = $state(false);
-	let description: string = $state('');
-	let readme: string = $state('');
-	let changelog: string = $state('');
-	let versionNumber: string = $state('');
-	let iconPath: string = $state('');
-	let websiteUrl: string = $state('');
-	let includeDisabled: boolean = $state(false);
-	let hexiumExclusive: boolean = $state(false);
-	let backend: Backend = $state(Backend.Thunderstore);
+	const initialProfileId = untrack(() => profiles.active?.id ?? null);
+	const cached =
+		cachedProfileId !== null && cachedProfileId === initialProfileId ? cachedArgs : null;
+
+	let name: string = $state(cached?.name ?? '');
+	let author: string = $state(cached?.author ?? '');
+	let selectedCategories: string[] = $state(cached?.categories ?? []);
+	let nsfw: boolean = $state(cached?.nsfw ?? false);
+	let description: string = $state(cached?.description ?? '');
+	let readme: string = $state(cached?.readme ?? '');
+	let changelog: string = $state(cached?.changelog ?? '');
+	let versionNumber: string = $state(cached?.versionNumber ?? '');
+	let iconPath: string = $state(cached?.iconPath ?? '');
+	let websiteUrl: string = $state(cached?.websiteUrl ?? '');
+	let includeDisabled: boolean = $state(cached?.includeDisabled ?? false);
+	let hexiumExclusive: boolean = $state(cached !== null && cachedHexiumExclusive);
+	let backend: Backend = $state(cached?.backend ?? Backend.Thunderstore);
 
 	let doneDialogOpen = $state(false);
 	let uploadResult: UploadSubmissionResult = $state({});
 	let loading: string | null = $state(null);
+	let hasArgs = $state(cached !== null);
 
-	let includeFiles = $state(new SvelteMap<string, boolean>());
+	let includeFiles = $state(cached ? new SvelteMap(cached.includeFileMap) : new SvelteMap<string, boolean>());
 	let includedFileCount = $state(0);
 	let includedFilesSearch = $state('');
 
@@ -81,26 +95,35 @@
 	}
 
 	async function refresh() {
-		loading = m.modpack_refresh_loading();
+		const profileId = profiles.active?.id ?? null;
+
+		if (!hasArgs) {
+			loading = m.modpack_refresh_loading();
+		}
 
 		let info = await api.profile.export.getPackArgs();
-		let args = info.args;
+		let pack = info.args;
 
 		// Exclusive for Hexium if initial fetch already reports Hexium
-		name = args.name;
-		author = args.author;
-		nsfw = args.nsfw;
-		description = args.description;
-		selectedCategories = args.categories;
-		changelog = args.changelog;
-		readme = args.readme;
-		versionNumber = args.versionNumber;
-		iconPath = args.iconPath;
-		websiteUrl = args.websiteUrl;
-		includeDisabled = args.includeDisabled;
-		includeFiles = new SvelteMap(Object.entries(args.includeFileMap));
-		backend = args.backend;
+		name = pack.name;
+		author = pack.author;
+		nsfw = pack.nsfw;
+		description = pack.description;
+		selectedCategories = pack.categories;
+		changelog = pack.changelog;
+		readme = pack.readme;
+		versionNumber = pack.versionNumber;
+		iconPath = pack.iconPath;
+		websiteUrl = pack.websiteUrl;
+		includeDisabled = pack.includeDisabled;
+		includeFiles = new SvelteMap(Object.entries(pack.includeFileMap));
+		backend = pack.backend;
 		hexiumExclusive = info.hexiumExclusive;
+
+		hasArgs = true;
+		cachedProfileId = profileId;
+		cachedArgs = args();
+		cachedHexiumExclusive = hexiumExclusive;
 
 		loading = null;
 	}
@@ -175,7 +198,9 @@
 	function saveArgs() {
 		// wait a tick to ensure the variables are updated
 		setTimeout(() => {
-			api.profile.export.setPackArgs(args());
+			const packArgs = args();
+			cachedArgs = packArgs;
+			api.profile.export.setPackArgs(packArgs);
 		});
 	}
 
