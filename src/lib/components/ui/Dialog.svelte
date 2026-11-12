@@ -14,6 +14,7 @@
 		large?: boolean;
 		noscroll?: boolean;
 		focusContent?: boolean;
+		selectNone?: boolean;
 		onclose?: () => void;
 		children?: Snippet;
 	};
@@ -26,6 +27,7 @@
 		large = false,
 		noscroll = false,
 		focusContent = false,
+		selectNone = false,
 		onclose,
 		children
 	}: Props = $props();
@@ -88,6 +90,7 @@
 						class={[
 							large ? 'max-w-240' : 'max-w-140',
 							noscroll ? 'flex flex-col overflow-y-hidden' : 'overflow-y-auto',
+							selectNone && 'select-none',
 							'border-primary-300 dark:border-primary-600 dark:bg-primary-800 pointer-events-auto relative z-30 max-h-[85%] w-[85%] overflow-x-hidden rounded-xl border bg-white p-6 shadow-xl'
 						]}
 					>

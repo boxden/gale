@@ -63,7 +63,7 @@
 	}
 </script>
 
-<Dialog title={m.welcomeDialog_title()} canClose={stage === 'end'} bind:open>
+<Dialog title={m.welcomeDialog_title()} canClose={stage === 'end'} bind:open selectNone>
 	<div class="text-primary-600 dark:text-primary-300">
 		{#if stage === 'gameSelect'}
 			{m.welcomeDialog_content_gameSelect()}
