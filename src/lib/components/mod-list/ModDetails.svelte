@@ -1,3 +1,36 @@
+<script module lang="ts">
+	import type { Mod } from '$lib/types';
+
+	// enough to keep both tabs' open mods and a few recently viewed ones, so
+	// returning to a tab paints its readme in the first frame instead of
+	// swapping the skeleton in afterwards
+	const README_CACHE_MAX = 8;
+	const readmeCache = new Map<string, string | null>();
+
+	function readmeKeyOf(mod: Mod) {
+		return `${mod.type}:${mod.backend}:${mod.uuid}:${mod.versionUuid}`;
+	}
+
+	function takeCachedReadme(key: string) {
+		if (!readmeCache.has(key)) return undefined;
+
+		const readme = readmeCache.get(key)!;
+		readmeCache.delete(key);
+		readmeCache.set(key, readme);
+		return readme;
+	}
+
+	function storeReadme(key: string, readme: string | null) {
+		readmeCache.delete(key);
+		readmeCache.set(key, readme);
+
+		if (readmeCache.size > README_CACHE_MAX) {
+			const oldest = readmeCache.keys().next().value;
+			if (oldest !== undefined) readmeCache.delete(oldest);
+		}
+	}
+</script>
+
 <script lang="ts">
 	import Dialog from '$lib/components/ui/Dialog.svelte';
 	import Markdown from '$lib/components/ui/Markdown.svelte';
@@ -6,7 +39,7 @@
 	import ModCardList from '../ui/ModCardList.svelte';
 	import { rememberScroll } from '$lib/scrollMemory';
 
-	import { type ContextItem, type Mod, ModType } from '$lib/types';
+	import { type ContextItem, ModType } from '$lib/types';
 	import {
 		communityUrl,
 		formatModName,
@@ -52,7 +85,9 @@
 	let suggestionsOpen = $state(false);
 
 	let readmeOpen = $state(false);
-	let readmePromise: Promise<string | null> | null = $state(null);
+	let readme: string | null | undefined = $state(
+		untrack(() => takeCachedReadme(readmeKeyOf(mod)))
+	);
 
 	let changelogOpen = $state(false);
 	let changelogPromise: Promise<string | null> | null = $state(null);
@@ -87,13 +122,16 @@
 	}
 
 	// key on readme identity so a list refresh re-resolving the mod doesn't refetch and collapse the restored scroll
-	const readmeKey = $derived(`${mod.type}:${mod.backend}:${mod.uuid}:${mod.versionUuid}`);
+	const readmeKey = $derived(readmeKeyOf(mod));
 	$effect(() => {
-		readmeKey;
-		readmePromise = getMarkdown(
-			untrack(() => mod),
-			'readme'
-		);
+		const key = readmeKey;
+		readme = takeCachedReadme(key);
+		getMarkdown(untrack(() => mod), 'readme').then((result) => {
+			storeReadme(key, result);
+			// a slower response for a mod that was swapped out must not
+			// overwrite the readme currently on screen
+			if (readmeKeyOf(mod) === key) readme = result;
+		});
 	});
 </script>
 
@@ -207,7 +245,7 @@
 		{/if}
 
 		<div class="hidden lg:block">
-			{#await readmePromise}
+			{#if readme === undefined}
 				<div role="status" class="animate-pulse">
 					<div class="dark:bg-primary-700 bg-primary-200 mt-4 h-8 w-80 rounded-xl"></div>
 					<div class="dark:bg-primary-700 bg-primary-200 mt-6 h-3 max-w-125 rounded-full"></div>
@@ -216,9 +254,9 @@
 						class="dark:bg-primary-700 bg-primary-200 mt-2.5 mb-4 h-3 max-w-100 rounded-full"
 					></div>
 				</div>
-			{:then readme}
+			{:else}
 				<Markdown source={readme ? formatReadme(readme) : m.modDetails_noFound()} />
-			{/await}
+			{/if}
 		</div>
 	</div>
 
@@ -284,9 +322,9 @@
 	{/if}
 </Dialog>
 
-{#await readmePromise then readme}
+{#if readme !== undefined}
 	<ModInfoDialog bind:open={readmeOpen} content={readme} type="readme" />
-{/await}
+{/if}
 
 {#await changelogPromise then changelog}
 	<ModInfoDialog bind:open={changelogOpen} content={changelog} type="changelog" />

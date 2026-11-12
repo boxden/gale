@@ -6,6 +6,7 @@
 	let cachedTotalModCount = 0;
 	let cachedUnknownMods: Dependant[] = [];
 	let cachedUpdates = new Map<string, AvailableUpdate>();
+	let cachedSelectedUuid: string | null = null;
 </script>
 
 <script lang="ts">
@@ -139,7 +140,11 @@
 		hasCachedQuery ? cachedUpdates : new Map()
 	);
 
-	let selectedMod: ProfileMod | null = $state(null);
+	let selectedMod: ProfileMod | null = $state(
+		hasCachedQuery && cachedSelectedUuid !== null
+			? (cachedMods.find((mod) => mod.data.uuid === cachedSelectedUuid) ?? null)
+			: null
+	);
 
 	let removeDependants: DependantsDialog;
 	let disableDependants: DependantsDialog;
@@ -184,15 +189,22 @@
 			cachedUnknownMods = unknownMods;
 			cachedUpdates = updateMap;
 
-			if (selectedMod !== null) {
-				selectedMod = mods.find((mod) => mod.data.uuid === selectedMod!.data.uuid) ?? null;
-			}
+			const selectedUuid = selectedMod?.data.uuid ?? cachedSelectedUuid;
+			selectedMod = selectedUuid
+				? (mods.find((mod) => mod.data.uuid === selectedUuid) ?? null)
+				: null;
+			cachedSelectedUuid = selectedMod?.data.uuid ?? null;
 
 			hasRefreshed = true;
 		})();
 
 		await refreshPromise;
 		refreshPromise = null;
+	}
+
+	function selectMod(mod: ProfileMod | null) {
+		selectedMod = mod;
+		cachedSelectedUuid = mod?.data.uuid ?? null;
 	}
 
 	async function toggleMod(mod: ProfileMod, newState: boolean) {
@@ -215,7 +227,7 @@
 		let response = await api.profile.removeMod(mod.data.uuid);
 
 		if (response.type == 'done') {
-			selectedMod = null;
+			selectMod(null);
 		} else {
 			removeDependants.openFor(mod.data, response.dependants);
 		}
@@ -223,7 +235,7 @@
 
 	async function forceUninstall(...uuids: string[]) {
 		await api.profile.forceRemoveMods(uuids);
-		selectedMod = null;
+		selectMod(null);
 	}
 
 	async function openDependants(mod: ProfileMod) {
@@ -343,13 +355,8 @@
 							update={updates.get(mod.data.uuid)}
 							selected={selectedMod?.data.uuid === mod.data.uuid}
 							ontoggle={(newState) => toggleMod(mod, newState)}
-							onclick={() => {
-								if (selectedMod?.data.uuid === mod.data.uuid) {
-									selectedMod = null;
-								} else {
-									selectedMod = mod;
-								}
-							}}
+							onclick={() =>
+								selectMod(selectedMod?.data.uuid === mod.data.uuid ? null : mod)}
 						/>
 					{/snippet}
 				</ReorderableList>
@@ -362,7 +369,7 @@
 			<ModDetails
 				mod={selectedMod.data}
 				contextItems={resolveModContextItems(contextItems, selectedMod, locked)}
-				onclose={() => (selectedMod = null)}
+				onclose={() => selectMod(null)}
 			>
 				{#if update && !locked}
 					{@const isPrerelease = isNonReleaseVersion(update?.new)}
@@ -417,7 +424,7 @@
 	description={m.page_dependantsDialog_uninstall_description()}
 	commandName="remove_mod"
 	onExecute={() => {
-		selectedMod = null;
+		selectMod(null);
 	}}
 	onCancel={refresh}
 />
