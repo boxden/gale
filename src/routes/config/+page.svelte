@@ -12,6 +12,7 @@
 	import LargeHeading from '$lib/components/prefs/LargeHeading.svelte';
 	import config from '$lib/state/config.svelte';
 	import HelpCard from '$lib/components/ui/HelpCard.svelte';
+	import { rememberScroll } from '$lib/scrollMemory';
 	import { onMount } from 'svelte';
 
 	const selectedFile = $derived(config.selectedFile);
@@ -33,7 +34,7 @@
 			<ConfigFileList bind:searchTerm />
 		{/if}
 
-		<div class="max-w-5xl overflow-y-auto p-4 pt-0 pl-2">
+		<div class="max-w-5xl overflow-y-auto p-4 pt-0 pl-2" use:rememberScroll={'config-editor'}>
 			{#if profiles.activeInstallAndConfigLocked}
 				<ProfileLockedBanner class="mt-4 mb-4" />
 			{/if}

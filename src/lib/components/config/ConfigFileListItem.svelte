@@ -1,3 +1,8 @@
+<script module lang="ts">
+	// expansions are kept for the session so a tab switch doesn't collapse the list
+	const expandedFiles = new Set<string>();
+</script>
+
 <script lang="ts">
 	import * as api from '$lib/api';
 	import IconButton from '$lib/components/ui/IconButton.svelte';
@@ -7,6 +12,7 @@
 	import Icon from '@iconify/svelte';
 	import { confirm } from '@tauri-apps/plugin-dialog';
 	import { Collapsible } from 'bits-ui';
+	import { untrack } from 'svelte';
 	import DropdownArrow from '../ui/DropdownArrow.svelte';
 
 	type Props = {
@@ -17,7 +23,15 @@
 
 	let { file, duplicate, locked }: Props = $props();
 
-	let open = $state(false);
+	let open = $state(untrack(() => expandedFiles.has(file.relativePath)));
+
+	$effect(() => {
+		if (open) {
+			expandedFiles.add(file.relativePath);
+		} else {
+			expandedFiles.delete(file.relativePath);
+		}
+	});
 
 	let shownSections = $derived(
 		file.type === 'ok' ? file.sections.filter((section) => section.entries.length > 0) : []
