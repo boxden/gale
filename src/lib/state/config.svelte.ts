@@ -3,6 +3,7 @@ import * as api from '$lib/api';
 import type { BaseConfigFile, ConfigFile, ConfigSection } from '$lib/types';
 import { untrack } from 'svelte';
 import profiles from './profile.svelte';
+import { pushToast } from '$lib/toast';
 
 class ConfigState {
 	files: ConfigFile[] = $state([]);
@@ -40,7 +41,16 @@ class ConfigState {
 
 			this.hasLoaded = true;
 			this.loadedProfileId = profileId;
+		} catch (err) {
+			console.error('failed to load config files', err);
+			pushToast({
+				type: 'error',
+				name: 'Config',
+				message: 'Failed to load config files. Check the log for details.'
+			});
 		} finally {
+			// also settle the first visit after an error so the page is not blank
+			this.hasLoaded = true;
 			this.loading = false;
 		}
 	}

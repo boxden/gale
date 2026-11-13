@@ -29,7 +29,7 @@
 	import games from '$lib/state/game.svelte';
 	import { scrollAnchors } from '$lib/scrollMemory';
 	import { m } from '$lib/paraglide/messages';
-	import { pushInfoToast } from '$lib/toast';
+	import { pushInfoToast, pushToast } from '$lib/toast';
 	import HelpCard from '$lib/components/ui/HelpCard.svelte';
 	import ForeignDownloadDialog from '$lib/components/dialogs/ForeignDownloadDialog.svelte';
 	import {
@@ -124,25 +124,36 @@
 		}
 
 		refreshing = true;
-		do {
-			refreshPending = false;
+		try {
+			do {
+				refreshPending = false;
 
-			cacheMods(await api.thunderstore.query({ ...modQuery.current, maxCount }));
-			if (cachedSelectedKey) {
-				const found = findItemByUuid(cachedSelectedKey);
+				cacheMods(await api.thunderstore.query({ ...modQuery.current, maxCount }));
+				if (cachedSelectedKey) {
+					const found = findItemByUuid(cachedSelectedKey);
 
-				if (found) {
-					// isInstalled might have changed
-					selectedMod = found;
-				} else if (selectedMod) {
-					selectedMod = null;
-					cachedSelectedKey = null;
+					if (found) {
+						// isInstalled might have changed
+						selectedMod = found;
+					} else if (selectedMod) {
+						selectedMod = null;
+						cachedSelectedKey = null;
+					}
 				}
-			}
-		} while (refreshPending);
+			} while (refreshPending);
 
-		refreshing = false;
-		hasRefreshed = true;
+			hasRefreshed = true;
+		} catch (err) {
+			console.error('failed to refresh mod catalog', err);
+			pushToast({
+				type: 'error',
+				name: 'Browse',
+				message: 'Failed to load the mod catalog. Check the log for details.'
+			});
+			hasRefreshed = true;
+		} finally {
+			refreshing = false;
+		}
 	}
 
 	async function installLatest(mod: Mod) {

@@ -47,7 +47,7 @@
 	import Button from '$lib/components/ui/Button.svelte';
 	import { onDestroy, untrack } from 'svelte';
 	import ForeignDownloadDialog from '$lib/components/dialogs/ForeignDownloadDialog.svelte';
-	import { pushInfoToast } from '$lib/toast';
+	import { pushInfoToast, pushToast } from '$lib/toast';
 
 	const sortOptions: SortBy[] = [
 		'custom',
@@ -173,37 +173,51 @@
 			do {
 				refreshPending = false;
 
-				const profileId = profiles.active?.id ?? null;
-				const result = await api.profile.query({ ...profileQuery.current, maxCount: null });
+				try {
+					const profileId = profiles.active?.id ?? null;
+					const result = await api.profile.query({ ...profileQuery.current, maxCount: null });
 
-				const updateMap = new Map(
-					result.updates.map((update) => [update.updatedId.packageUuid, update])
-				);
+					const updateMap = new Map(
+						result.updates.map((update) => [update.updatedId.packageUuid, update])
+					);
 
-				mods = result.mods;
-				items = result.mods.map((mod) => ({ type: 'mod', mod }));
-				totalModCount = result.totalModCount;
-				unknownMods = result.unknownMods;
-				updates = updateMap;
+					mods = result.mods;
+					items = result.mods.map((mod) => ({ type: 'mod', mod }));
+					totalModCount = result.totalModCount;
+					unknownMods = result.unknownMods;
+					updates = updateMap;
 
-				cachedProfileId = profileId;
-				cachedMods = mods;
-				cachedTotalModCount = totalModCount;
-				cachedUnknownMods = unknownMods;
-				cachedUpdates = updateMap;
+					cachedProfileId = profileId;
+					cachedMods = mods;
+					cachedTotalModCount = totalModCount;
+					cachedUnknownMods = unknownMods;
+					cachedUpdates = updateMap;
 
-				const selectedUuid = selectedMod?.data.uuid ?? cachedSelectedUuid;
-				selectedMod = selectedUuid
-					? (mods.find((mod) => mod.data.uuid === selectedUuid) ?? null)
-					: null;
-				cachedSelectedUuid = selectedMod?.data.uuid ?? null;
+					const selectedUuid = selectedMod?.data.uuid ?? cachedSelectedUuid;
+					selectedMod = selectedUuid
+						? (mods.find((mod) => mod.data.uuid === selectedUuid) ?? null)
+						: null;
+					cachedSelectedUuid = selectedMod?.data.uuid ?? null;
 
-				hasRefreshed = true;
+					hasRefreshed = true;
+				} catch (err) {
+					console.error('failed to refresh profile mods', err);
+					pushToast({
+						type: 'error',
+						name: 'Profile',
+						message: 'Failed to load the mod list. Check the log for details.'
+					});
+					// don't leave the page in a permanent blank state if the query fails
+					hasRefreshed = true;
+				}
 			} while (refreshPending);
 		})();
 
-		await refreshPromise;
-		refreshPromise = null;
+		try {
+			await refreshPromise;
+		} finally {
+			refreshPromise = null;
+		}
 	}
 
 	function selectMod(mod: ProfileMod | null) {
