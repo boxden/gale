@@ -63,7 +63,6 @@
 		<Combobox.Content
 			forceMount
 			side="bottom"
-			avoidCollisions={false}
 			collisionPadding={8}
 			preventOverflowTextSelection={false}
 		>

@@ -14,6 +14,7 @@
 		items: { value: string; label: string; description?: string; disabled?: boolean }[];
 		triggerClass?: string;
 		icon?: string;
+		avoidCollisions?: boolean;
 		item?: Snippet<[{ label: string; value: string; selected: boolean }]>;
 	} & (
 			| {
@@ -38,6 +39,7 @@
 		items,
 		placeholder,
 		icon,
+		avoidCollisions,
 		label,
 		item: itemSnippet,
 		...restProps
@@ -89,8 +91,8 @@
 	<Select.Portal>
 		<Select.Content
 			forceMount
+			{avoidCollisions}
 			side="bottom"
-			avoidCollisions={false}
 			collisionPadding={8}
 			preventOverflowTextSelection={false}
 		>
