@@ -53,7 +53,7 @@
 	/>
 
 	<div
-		class="dark:bg-primary-700 dark:group-hover:bg-primary-600 bg-primary-200 group-hover:bg-primary-300 mr-1 rounded-sm px-1.5 py-0.5 text-xs"
+		class="dark:bg-primary-700 dark:group-hover:bg-primary-600 bg-primary-200 group-hover:bg-primary-300 mr-1 rounded-sm px-1.5 py-0.5 text-center text-xs tabular-nums"
 	>
 		{profile.modCount}
 	</div>
