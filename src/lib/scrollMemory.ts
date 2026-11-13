@@ -18,19 +18,18 @@ export const scrollAnchors = new Map<string, { index: number; offset: number; id
 // live position — covers slow async content without looping forever
 const RESTORE_TIMEOUT_MS = 4000;
 
-/**
- * Svelte action that persists an element's scrollTop while the page is
- * alive and restores it when the page is mounted again. The restore is
- * retried while the content is still mutating, since async page content
- * can temporarily clamp the scroll position back to 0.
- *
- * Pass `null` to disable the action for an element.
- */
-export function rememberScroll(node: HTMLElement, key: string | null = page.url.pathname) {
-	if (key === null) return;
+// a pending restore must never fight the user: a wheel or touch scroll is
+// unambiguous intent, so accept whatever position they pick from then on
+const USER_SCROLL_EVENTS = ['wheel', 'touchstart'] as const;
 
+type ScrollMemoryHandle = {
+	flush: () => void;
+	stop: () => void;
+};
+
+function trackScroll(node: HTMLElement, key: string, restore: boolean): ScrollMemoryHandle {
 	const saved = scrollPositions.get(key);
-	let restored = saved === undefined;
+	let restored = !restore || saved === undefined;
 	let verifyRaf = 0;
 	let timeout: ReturnType<typeof setTimeout> | undefined;
 	let observer: ResizeObserver | undefined;
@@ -70,11 +69,12 @@ export function rememberScroll(node: HTMLElement, key: string | null = page.url.
 	};
 
 	if (!restored) {
-		// backstop: if the content never grows enough, stop retrying and
-		// remember wherever the user actually ended up instead
+		// backstop: if the content never grows enough, stop retrying. Keep the
+		// remembered offset unless the content actually moved, so a shorter
+		// render this time doesn't erase a position that is still valid
 		timeout = setTimeout(() => {
 			finish();
-			scrollPositions.set(key, node.scrollTop);
+			if (node.scrollTop > 0) scrollPositions.set(key, node.scrollTop);
 		}, RESTORE_TIMEOUT_MS);
 	}
 
@@ -105,16 +105,64 @@ export function rememberScroll(node: HTMLElement, key: string | null = page.url.
 	};
 	node.addEventListener('scroll', onScroll, { passive: true });
 
+	// the scroll event that follows a wheel/touch gesture records the new
+	// position; this only has to stop the restore from pulling it back
+	const onUserScroll = () => {
+		if (!restored) finish();
+	};
+	for (const event of USER_SCROLL_EVENTS) {
+		node.addEventListener(event, onUserScroll, { passive: true });
+	}
+
 	return {
-		destroy() {
+		flush: onScroll,
+		stop() {
 			node.removeEventListener('scroll', onScroll);
-			observer.disconnect();
-			mutations.disconnect();
+			for (const event of USER_SCROLL_EVENTS) {
+				node.removeEventListener(event, onUserScroll);
+			}
+			observer?.disconnect();
+			mutations?.disconnect();
 			if (verifyRaf !== 0) cancelAnimationFrame(verifyRaf);
 			if (timeout !== undefined) clearTimeout(timeout);
-			// no final write here: the DOM has already collapsed by the time
-			// destroy runs, so scrollTop reads 0 and would clobber the saved
-			// position. The scroll listener keeps the map fresh instead.
+		}
+	};
+}
+
+/**
+ * Svelte action that persists an element's scrollTop while the page is
+ * alive and restores it when the page is mounted again. The restore is
+ * retried while the content is still mutating, since async page content
+ * can temporarily clamp the scroll position back to 0.
+ *
+ * Pass `null` to disable the action for an element.
+ */
+export function rememberScroll(node: HTMLElement, initialKey: string | null = page.url.pathname) {
+	let current: { key: string; handle: ScrollMemoryHandle } | null = null;
+
+	const start = (key: string | null, restore: boolean) => {
+		current?.handle.stop();
+		current = null;
+
+		if (key !== null) {
+			current = { key, handle: trackScroll(node, key, restore) };
+		}
+	};
+
+	start(initialKey, true);
+
+	return {
+		update(key: string | null) {
+			if (key === (current?.key ?? null)) return;
+
+			// persist the offset under the previous key, but don't restore the
+			// new one: its content is already on screen, and jumping it while
+			// the user clicks through items would be disorienting
+			current?.handle.flush();
+			start(key, false);
+		},
+		destroy() {
+			current?.handle.stop();
 		}
 	};
 }

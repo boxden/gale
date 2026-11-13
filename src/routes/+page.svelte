@@ -415,7 +415,12 @@
 					{m.page_modList_noResults_2()}
 				</HelpCard>
 			{:else}
-				<ReorderableList bind:items {onmove} {reorderable} scrollKey="profile-mods">
+				<ReorderableList
+					bind:items
+					{onmove}
+					{reorderable}
+					scrollKey={`profile-mods:${profiles.active?.id ?? 'none'}`}
+				>
 					{#snippet mod({ mod, index })}
 						<ProfileModListItem
 							{mod}

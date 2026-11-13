@@ -54,6 +54,7 @@
 
 	import Icon from '@iconify/svelte';
 	import { untrack, type Snippet } from 'svelte';
+	import { page } from '$app/state';
 	import { m } from '$lib/paraglide/messages';
 	import config from '$lib/state/config.svelte';
 	import InfoBox from '../ui/InfoBox.svelte';
@@ -123,6 +124,12 @@
 
 	// key on readme identity so a list refresh re-resolving the mod doesn't refetch and collapse the restored scroll
 	const readmeKey = $derived(readmeKeyOf(mod));
+
+	// the panel is the same component for every mod, so the scroll key must
+	// include the mod (and the tab it was opened from) to never restore one
+	// mod's readme position onto another
+	const scrollKey = $derived(`mod-details:${page.url.pathname}:${readmeKey}`);
+
 	$effect(() => {
 		const key = readmeKey;
 		readme = takeCachedReadme(key);
@@ -145,7 +152,10 @@
 		<ContextMenuContent items={allContextItems} type="dropdown" />
 	</DropdownMenu.Root>
 
-	<div class="-mr-3 grow overflow-x-hidden overflow-y-scroll pr-3 pb-2" use:rememberScroll>
+	<div
+		class="-mr-3 grow overflow-x-hidden overflow-y-scroll pr-3 pb-2"
+		use:rememberScroll={scrollKey}
+	>
 		<div class="mb-3 flex flex-col gap-4 xl:flex-row xl:items-center">
 			<img src={modIconSrc(mod)} class="max-h-30 max-w-30 rounded-lg" alt="" />
 
