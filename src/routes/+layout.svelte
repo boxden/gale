@@ -115,7 +115,7 @@
 	}}
 />
 
-<Tooltip.Provider skipDelayDuration={1} disableCloseOnTriggerClick>
+<Tooltip.Provider skipDelayDuration={1} disableCloseOnTriggerClick disableHoverableContent>
 	<main class="dark:bg-primary-800 relative flex flex-col bg-white">
 		<Menubar />
 		<Toolbar />
