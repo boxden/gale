@@ -60,7 +60,6 @@
 	let doneDialogOpen = $state(false);
 	let uploadResult: UploadSubmissionResult = $state({});
 	let loading: string | null = $state(null);
-	let hasArgs = $state(cached !== null);
 
 	let includeFiles = $state(
 		cached ? new SvelteMap(cached.includeFileMap) : new SvelteMap<string, boolean>()
@@ -99,7 +98,10 @@
 	async function refresh() {
 		const profileId = profiles.active?.id ?? null;
 
-		if (!hasArgs) {
+		// only a revisit of the same profile may render straight from the
+		// session cache; a different profile must hide the form until its own
+		// args arrive, or edits made meanwhile would land in the wrong profile
+		if (cachedProfileId !== profileId) {
 			loading = m.modpack_refresh_loading();
 		}
 
@@ -122,7 +124,6 @@
 		backend = pack.backend;
 		hexiumExclusive = info.hexiumExclusive;
 
-		hasArgs = true;
 		cachedProfileId = profileId;
 		cachedArgs = args();
 		cachedHexiumExclusive = hexiumExclusive;
@@ -198,8 +199,14 @@
 	}
 
 	function saveArgs() {
+		const profileId = profiles.active?.id ?? null;
+
 		// wait a tick to ensure the variables are updated
 		setTimeout(() => {
+			// the fields may still describe the previous profile for a tick
+			// after a switch; never persist those into the newly active one
+			if ((profiles.active?.id ?? null) !== profileId) return;
+
 			const packArgs = args();
 			cachedArgs = packArgs;
 			api.profile.export.setPackArgs(packArgs);
