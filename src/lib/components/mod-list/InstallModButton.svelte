@@ -43,8 +43,15 @@
 	);
 
 	$effect(() => {
-		api.profile.install.getDownloadSize(modId).then((size) => (downloadSize = size));
-		api.profile.install.isInstalling(mod.uuid).then((installing) => (isInstalling = installing));
+		api.profile.install
+			.getDownloadSize(modId)
+			.then((size) => (downloadSize = size))
+			.catch(() => {});
+		api.profile.install
+			.isInstalling(mod.uuid)
+			.then((installing) => (isInstalling = installing))
+			// a failed check must not leave the button hidden forever
+			.catch(() => (isInstalling = false));
 	});
 
 	function doInstall(modId: ModId) {
