@@ -988,10 +988,10 @@ fn reconnect(settings: &RemoteServerSettings, password: &str) -> Result<RemoteCo
     match remote::connect(settings, password)? {
         ConnectionAttempt::Connected(connection) => Ok(connection),
         ConnectionAttempt::HostKeyUntrusted { .. } => {
-            bail!("remote host key became untrusted while reconnecting")
+            bail!("remote host key became untrusted while reconnecting");
         }
         ConnectionAttempt::CertificateUntrusted => {
-            bail!("FTPS certificate became untrusted while reconnecting")
+            bail!("FTPS certificate became untrusted while reconnecting");
         }
     }
 }

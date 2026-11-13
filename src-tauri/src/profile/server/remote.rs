@@ -531,7 +531,7 @@ fn connect_tcp(settings: &RemoteServerSettings) -> Result<ssh2::Session> {
         last_error
             .map(|error| error.to_string())
             .unwrap_or_else(|| "unknown network error".to_owned())
-    )
+    );
 }
 
 fn host_key_fingerprint(session: &ssh2::Session) -> Result<String> {
