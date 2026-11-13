@@ -26,6 +26,7 @@
 	import { getDefaultContextItems } from '$lib/context';
 	import profiles from '$lib/state/profile.svelte';
 	import { modQuery } from '$lib/state/misc.svelte';
+	import installState from '$lib/state/install.svelte';
 	import games from '$lib/state/game.svelte';
 	import { scrollAnchors } from '$lib/scrollMemory';
 	import { m } from '$lib/paraglide/messages';
@@ -204,6 +205,22 @@
 	let profileRefreshTimer: ReturnType<typeof setTimeout> | undefined;
 	let firstRefresh = true;
 
+	function scheduleBrowseRefresh() {
+		if (profileRefreshTimer !== undefined) clearTimeout(profileRefreshTimer);
+		profileRefreshTimer = setTimeout(() => {
+			profileRefreshTimer = undefined;
+
+			// don't re-query the catalog in the middle of a large batch; wait
+			// until the install queue has drained, then refresh once
+			if (installState.active) {
+				scheduleBrowseRefresh();
+				return;
+			}
+
+			untrack(() => refresh());
+		}, 500);
+	}
+
 	$effect(() => {
 		const profileId = profiles.activeId;
 		// read all fields of modQuery.current to trigger the effect when any of them change
@@ -237,11 +254,7 @@
 
 		if (count <= 0) return;
 
-		if (profileRefreshTimer !== undefined) clearTimeout(profileRefreshTimer);
-		profileRefreshTimer = setTimeout(() => {
-			profileRefreshTimer = undefined;
-			untrack(() => refresh());
-		}, 500);
+		scheduleBrowseRefresh();
 	});
 
 	onDestroy(() => {

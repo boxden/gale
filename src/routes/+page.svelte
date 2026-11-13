@@ -40,6 +40,7 @@
 	import UnknownModsBanner from '$lib/components/mod-list/UnknownModsBanner.svelte';
 	import profiles from '$lib/state/profile.svelte';
 	import { profileQuery } from '$lib/state/misc.svelte';
+	import installState from '$lib/state/install.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import ReorderableList from '$lib/components/profile/ReorderableList.svelte';
 	import HelpCard from '$lib/components/ui/HelpCard.svelte';
@@ -315,6 +316,22 @@
 	let profileRefreshTimer: ReturnType<typeof setTimeout> | undefined;
 	let firstProfileRefresh = true;
 
+	function scheduleProfileRefresh() {
+		if (profileRefreshTimer !== undefined) clearTimeout(profileRefreshTimer);
+		profileRefreshTimer = setTimeout(() => {
+			profileRefreshTimer = undefined;
+
+			// don't re-query the whole profile in the middle of a large batch;
+			// wait until the install queue has drained, then refresh once
+			if (installState.active) {
+				scheduleProfileRefresh();
+				return;
+			}
+
+			untrack(() => refresh());
+		}, 500);
+	}
+
 	$effect(() => {
 		const profileId = profiles.active?.id ?? null;
 		// read all fields of profileQuery.current to trigger the effect when any of them change
@@ -341,11 +358,7 @@
 			return;
 		}
 
-		if (profileRefreshTimer !== undefined) clearTimeout(profileRefreshTimer);
-		profileRefreshTimer = setTimeout(() => {
-			profileRefreshTimer = undefined;
-			untrack(() => refresh());
-		}, 500);
+		scheduleProfileRefresh();
 	});
 
 	onDestroy(() => {
