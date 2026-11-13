@@ -163,7 +163,7 @@
 <div class="relative w-full">
 	<!-- clips the scrollbar corner to the rounded field outline -->
 	<div
-		class="has-[textarea:valid]:focus-within:ring-accent-600 dark:has-[textarea:valid]:focus-within:ring-accent-400 inline-block w-full overflow-hidden rounded-lg focus-within:ring-2 has-[textarea:invalid]:ring-1 has-[textarea:invalid]:ring-red-500 has-[textarea:invalid]:focus-within:ring-2"
+		class="has-[textarea:valid]:focus-within:ring-accent-600 dark:has-[textarea:valid]:focus-within:ring-accent-400 inline-block w-full overflow-hidden rounded-lg focus-within:ring-2 has-[textarea:user-invalid]:ring-1 has-[textarea:user-invalid]:ring-red-500 has-[textarea:user-invalid]:focus-within:ring-2"
 	>
 		<textarea
 			bind:this={textarea}

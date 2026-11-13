@@ -62,7 +62,9 @@
 	let loading: string | null = $state(null);
 	let hasArgs = $state(cached !== null);
 
-	let includeFiles = $state(cached ? new SvelteMap(cached.includeFileMap) : new SvelteMap<string, boolean>());
+	let includeFiles = $state(
+		cached ? new SvelteMap(cached.includeFileMap) : new SvelteMap<string, boolean>()
+	);
 	let includedFileCount = $state(0);
 	let includedFilesSearch = $state('');
 
@@ -397,6 +399,7 @@
 					bind:value={readme}
 					placeholder={m.modpack_readme_placeholder()}
 					mono={true}
+					required
 					scrollKey="modpack-readme"
 				/>
 
