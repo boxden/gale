@@ -18,6 +18,7 @@
 			scroller ?? panel.querySelector<HTMLElement>('[data-select-viewport]') ?? panel;
 
 		let frame = 0;
+		let updateFrame = 0;
 		let currentTop = 0;
 		let currentBottom = 0;
 		let targetTop = 0;
@@ -66,7 +67,8 @@
 			// variable, which is not always resolved; cap the panel from the
 			// viewport directly so it always stays inside the window
 			const viewportRoom = window.innerHeight - panel.getBoundingClientRect().top - 8;
-			panel.style.maxHeight = `${Math.min(24 * 16, Math.max(0, viewportRoom))}px`;
+			const maxHeight = `${Math.min(24 * 16, Math.max(0, viewportRoom))}px`;
+			if (panel.style.maxHeight !== maxHeight) panel.style.maxHeight = maxHeight;
 
 			const maxScroll = actualScroller.scrollHeight - actualScroller.clientHeight;
 			const nextTop = actualScroller.scrollTop > 1 ? FADE_SIZE : 0;
@@ -79,12 +81,22 @@
 			animateFade();
 		};
 
-		const resizeObserver = new ResizeObserver(update);
-		const mutationObserver = new MutationObserver(update);
+		// resize and mutation callbacks can fire many times per frame; coalesce
+		// them so the panel is measured and restyled at most once per frame
+		const scheduleUpdate = () => {
+			if (updateFrame !== 0) return;
+			updateFrame = requestAnimationFrame(() => {
+				updateFrame = 0;
+				update();
+			});
+		};
 
-		actualScroller.addEventListener('scroll', update, { passive: true });
-		window.addEventListener('resize', update);
-		window.addEventListener('scroll', update, true);
+		const resizeObserver = new ResizeObserver(scheduleUpdate);
+		const mutationObserver = new MutationObserver(scheduleUpdate);
+
+		actualScroller.addEventListener('scroll', scheduleUpdate, { passive: true });
+		window.addEventListener('resize', scheduleUpdate);
+		window.addEventListener('scroll', scheduleUpdate, true);
 		resizeObserver.observe(actualScroller);
 		mutationObserver.observe(actualScroller, { childList: true, subtree: true });
 
@@ -92,9 +104,10 @@
 
 		return () => {
 			cancelAnimationFrame(frame);
-			actualScroller.removeEventListener('scroll', update);
-			window.removeEventListener('resize', update);
-			window.removeEventListener('scroll', update, true);
+			cancelAnimationFrame(updateFrame);
+			actualScroller.removeEventListener('scroll', scheduleUpdate);
+			window.removeEventListener('resize', scheduleUpdate);
+			window.removeEventListener('scroll', scheduleUpdate, true);
 			resizeObserver.disconnect();
 			mutationObserver.disconnect();
 			actualScroller.style.maskImage = '';

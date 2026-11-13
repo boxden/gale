@@ -121,16 +121,28 @@
 		}
 
 		let raf = 0;
+		let saveTimer: ReturnType<typeof setTimeout> | undefined;
+
+		const save = () => {
+			saveTimer = undefined;
+			if (!node.style.width && !node.style.height) return;
+
+			sessionStorage.setItem(
+				storageKey,
+				JSON.stringify({ width: node.style.width, height: node.style.height })
+			);
+		};
+
 		const observer = new ResizeObserver(() => {
 			if (raf !== 0) return;
 			raf = requestAnimationFrame(() => {
 				raf = 0;
 				if (!node.style.width && !node.style.height) return;
 
-				sessionStorage.setItem(
-					storageKey,
-					JSON.stringify({ width: node.style.width, height: node.style.height })
-				);
+				// a window resize changes the laid-out size on every frame; only
+				// persist the chosen size once the resize settles
+				if (saveTimer !== undefined) clearTimeout(saveTimer);
+				saveTimer = setTimeout(save, 150);
 			});
 		});
 		observer.observe(node);
@@ -139,6 +151,10 @@
 			destroy() {
 				observer.disconnect();
 				if (raf !== 0) cancelAnimationFrame(raf);
+				if (saveTimer !== undefined) {
+					clearTimeout(saveTimer);
+					save();
+				}
 			}
 		};
 	}

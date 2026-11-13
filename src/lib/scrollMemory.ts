@@ -33,6 +33,8 @@ export function rememberScroll(node: HTMLElement, key: string | null = page.url.
 	let restored = saved === undefined;
 	let verifyRaf = 0;
 	let timeout: ReturnType<typeof setTimeout> | undefined;
+	let observer: ResizeObserver | undefined;
+	let mutations: MutationObserver | undefined;
 
 	const finish = () => {
 		restored = true;
@@ -40,6 +42,10 @@ export function rememberScroll(node: HTMLElement, key: string | null = page.url.
 			clearTimeout(timeout);
 			timeout = undefined;
 		}
+		// once the position is restored, the observers only add work to every
+		// window resize; the scroll listener keeps the saved offset fresh
+		observer?.disconnect();
+		mutations?.disconnect();
 	};
 
 	const tryRestore = () => {
@@ -72,14 +78,20 @@ export function rememberScroll(node: HTMLElement, key: string | null = page.url.
 		}, RESTORE_TIMEOUT_MS);
 	}
 
-	const observer = new ResizeObserver(tryRestore);
+	observer = new ResizeObserver(tryRestore);
 	observer.observe(node);
 	for (const child of node.children) observer.observe(child);
 	// children added after mount (async lists) aren't covered by the
 	// ResizeObserver above, so watch for DOM insertions too
-	const mutations = new MutationObserver(tryRestore);
+	mutations = new MutationObserver(tryRestore);
 	mutations.observe(node, { childList: true, subtree: true });
 	tryRestore();
+
+	// first visit: there is nothing to restore, so don't keep observing
+	if (restored) {
+		observer.disconnect();
+		mutations.disconnect();
+	}
 
 	// write synchronously on every scroll event: rAF can be throttled or
 	// delayed, losing the position if the page unmounts before the frame.

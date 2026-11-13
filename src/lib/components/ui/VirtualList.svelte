@@ -3,7 +3,7 @@
 
 	// (c) 2018 Rich Harris
 	// https://github.com/sveltejs/svelte-virtual-list/blob/master/LICENSE
-	import { onDestroy, onMount, tick, untrack, type Snippet } from 'svelte';
+	import { flushSync, onDestroy, onMount, tick, untrack, type Snippet } from 'svelte';
 	import { scrollAnchors } from '$lib/scrollMemory';
 
 	type Props = {
@@ -32,14 +32,19 @@
 
 	// local state
 	const OVERSCAN = 3;
+	// Keep a generous window of rows rendered below the viewport. A window
+	// resize can then grow the viewport by a large amount without mounting
+	// anything, so the list never shows a blank strip while the user drags.
+	const OVERSCAN_BOTTOM = 8;
 
 	let heightMap: number[] = [];
 	let rows: HTMLCollectionOf<HTMLElement>;
 	let viewport: HTMLElement;
 	let contents: HTMLElement;
-	let viewportHeight = $state(0);
+	let viewportHeight = 0;
+	let resizeObserver: ResizeObserver | undefined;
 	let renderStart = $derived(Math.max(0, start - OVERSCAN));
-	let renderEnd = $derived(Math.min(items.length, end + OVERSCAN));
+	let renderEnd = $derived(Math.min(items.length, end + OVERSCAN_BOTTOM));
 	let visible: { index: number; data: T }[] = $derived(
 		items.slice(renderStart, renderEnd).map((data, i) => {
 			return { index: i + renderStart, data };
@@ -424,28 +429,59 @@
 			'svelte-virtual-list-row'
 		) as HTMLCollectionOf<HTMLElement>;
 		mounted = true;
+
+		viewportHeight = viewport.offsetHeight;
+		refreshHeight = viewportHeight;
+
+		// The viewport is sized by its parent, so its height changes on every
+		// frame of a window resize. Keep the rendered window in sync using the
+		// heights that are already known (no DOM reads), and defer the accurate
+		// measuring pass until the resize settles.
+		resizeObserver = new ResizeObserver((entries) => {
+			const next = entries[0]?.contentRect.height ?? viewport.offsetHeight;
+			if (next === viewportHeight) return;
+
+			viewportHeight = next;
+			refreshHeight = next;
+			// apply the new rendered window before the browser paints the
+			// resized viewport, otherwise the newly exposed strip is visible
+			// for a frame
+			flushSync(() => {
+				growEndToFill(next);
+				shrinkEndToFit(next);
+			});
+			scheduleResizeRefresh();
+		});
+		resizeObserver.observe(viewport);
+
+		void refreshNext();
 	});
 
 	onDestroy(() => {
+		resizeObserver?.disconnect();
 		if (scrollRaf !== 0) cancelAnimationFrame(scrollRaf);
 		if (restoreTimer !== undefined) clearTimeout(restoreTimer);
 		if (settleTimer !== undefined) clearTimeout(settleTimer);
-		if (refreshTimer !== undefined) clearTimeout(refreshTimer);
+		if (resizeTimer !== undefined) clearTimeout(resizeTimer);
 		// no final write here: the DOM has already collapsed by the time
 		// onDestroy runs, so scrollTop reads 0 and would clobber the saved
 		// position. saveAnchor keeps the map fresh while scrolling instead.
 	});
 
-	// the viewport height changes on every frame while the window is resized,
-	// so refresh passes could pile up on top of each other; run them one at a
-	// time and repeat only when newer state arrived in the meantime
+	// A refresh measures the DOM, so it must not run on every frame of a window
+	// resize: the webview is already laying out and painting the new size, and
+	// an extra synchronous layout per frame is what makes resizing over long
+	// distances stutter. While the height keeps changing, only grow the
+	// rendered window using the heights that are already known, and run one
+	// accurate pass once the resize settles.
+	const RESIZE_SETTLE = 150;
+	let resizeTimer: ReturnType<typeof setTimeout> | undefined;
+
 	let refreshItems: T[] = [];
 	let refreshHeight = 0;
 	let refreshItemHeight: number | undefined;
 	let refreshing = false;
 	let refreshPending = false;
-	let lastRefreshAt = 0;
-	let refreshTimer: ReturnType<typeof setTimeout> | undefined;
 
 	async function refreshNext() {
 		if (refreshing) {
@@ -464,47 +500,81 @@
 		}
 	}
 
-	// each refresh measures the DOM, so height-driven refreshes are capped at
-	// ~10fps with a trailing run — the list stays correct once the resize
-	// settles instead of forcing layout on every frame
-	function scheduleRefresh() {
-		const wait = 100 - (performance.now() - lastRefreshAt);
-		if (wait <= 0) {
-			lastRefreshAt = performance.now();
-			void refreshNext();
-			return;
+	// Render enough rows to cover `height` pixels, using measured heights where
+	// they exist and the average row height elsewhere. Reads no layout, so it is
+	// safe to call on every resize frame. The already-rendered bottom overscan
+	// is included, so small and medium resizes mount nothing at all.
+	function growEndToFill(height: number) {
+		const average = itemHeight ?? average_height;
+		if (!average || average <= 0 || end >= items.length) return;
+
+		let covered = 0;
+		for (let i = start; i < renderEnd; i += 1) covered += heightMap[i] || average;
+
+		if (covered >= height) return;
+
+		const oldEnd = end;
+		// one row of slack: the estimate is never exact, and a row short of the
+		// viewport edge would show a blank strip until the settle pass
+		const needed = Math.ceil((height - covered) / average) + 1;
+		end = Math.min(items.length, end + needed);
+
+		// the rows that just became rendered are no longer part of the bottom
+		// spacer; keep the estimated scroll height consistent with them
+		let added = 0;
+		for (let i = oldEnd; i < end; i += 1) added += heightMap[i] || average;
+		bottom = Math.max(0, bottom - added);
+	}
+
+	// When the viewport shrinks, drop rows that are no longer needed so the
+	// rendered window doesn't keep growing across a long drag. The bottom
+	// overscan still covers the viewport, so this can't create a gap.
+	function shrinkEndToFit(height: number) {
+		const average = itemHeight ?? average_height;
+		if (!average || average <= 0 || end >= items.length) return;
+
+		let covered = 0;
+		let i = start;
+		while (i < end && covered < height) {
+			covered += heightMap[i] || average;
+			i += 1;
 		}
 
-		refreshTimer ??= setTimeout(() => {
-			refreshTimer = undefined;
-			lastRefreshAt = performance.now();
+		if (end <= i) return;
+
+		let removed = 0;
+		for (let j = i; j < end; j += 1) removed += heightMap[j] || average;
+		end = i;
+		bottom += removed;
+	}
+
+	function scheduleResizeRefresh() {
+		if (resizeTimer !== undefined) clearTimeout(resizeTimer);
+
+		resizeTimer = setTimeout(() => {
+			resizeTimer = undefined;
 			void refreshNext();
-		}, wait);
+		}, RESIZE_SETTLE);
 	}
 
 	// whenever `items` or the fixed item height changes, refresh immediately
 	run(() => {
 		refreshItems = items;
 		refreshItemHeight = itemHeight;
-		if (mounted) {
-			lastRefreshAt = performance.now();
-			if (refreshTimer !== undefined) {
-				clearTimeout(refreshTimer);
-				refreshTimer = undefined;
+		// the first refresh waits for onMount to read the real viewport height
+		if (mounted && refreshHeight > 0) {
+			if (resizeTimer !== undefined) {
+				clearTimeout(resizeTimer);
+				resizeTimer = undefined;
 			}
+			refreshHeight = viewportHeight;
 			void refreshNext();
 		}
-	});
-
-	run(() => {
-		refreshHeight = viewportHeight;
-		if (mounted) scheduleRefresh();
 	});
 </script>
 
 <svelte-virtual-list-viewport
 	bind:this={viewport}
-	bind:offsetHeight={viewportHeight}
 	onscroll={onScrollRequest}
 	style="height: {height}; visibility: {restorePending ? 'hidden' : 'visible'};"
 >
