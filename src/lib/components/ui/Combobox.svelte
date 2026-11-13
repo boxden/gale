@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { dropIn, dropOut } from '$lib/transitions';
+	import { popupSide } from '$lib/popup';
 	import Icon from '@iconify/svelte';
 	import { Combobox, type WithoutChildrenOrChild, mergeProps } from 'bits-ui';
 	import type { ClassValue } from 'clsx';
@@ -13,6 +14,8 @@
 	};
 
 	let content = $state<HTMLDivElement>();
+	let field = $state<HTMLElement | null>(null);
+	let side = $state<'top' | 'bottom'>('bottom');
 
 	let {
 		items = [],
@@ -40,10 +43,38 @@
 	}
 
 	const mergedRootProps = $derived(mergeProps(restProps, { onOpenChange: handleOpenChange }));
+
+	// measured before the panel mounts so the first placement already opens
+	// towards the side that has room for the list
+	$effect.pre(() => {
+		if (open) side = popupSide(field, items.length);
+	});
+
+	// the window can resize or the page can scroll under an open panel, so the
+	// side keeps following the free space instead of staying where it opened
+	$effect(() => {
+		if (!open) return;
+
+		let frame = 0;
+		const update = () => {
+			cancelAnimationFrame(frame);
+			frame = requestAnimationFrame(() => (side = popupSide(field, items.length)));
+		};
+
+		window.addEventListener('resize', update);
+		window.addEventListener('scroll', update, true);
+
+		return () => {
+			cancelAnimationFrame(frame);
+			window.removeEventListener('resize', update);
+			window.removeEventListener('scroll', update, true);
+		};
+	});
 </script>
 
 <Combobox.Root {type} {items} bind:value={value as never} bind:open {...mergedRootProps}>
 	<div
+		bind:this={field}
 		class={[
 			triggerClass,
 			'group hover:border-primary-400 focus-within:border-primary-400 group dark:bg-primary-900 dark:hover:border-primary-500 dark:focus-within:border-primary-500 bg-primary-100 flex items-center gap-2 overflow-hidden rounded-lg border border-transparent pr-2 disabled:cursor-not-allowed'
@@ -62,7 +93,8 @@
 	<Combobox.Portal>
 		<Combobox.Content
 			forceMount
-			side="bottom"
+			{side}
+			avoidCollisions={false}
 			collisionPadding={8}
 			preventOverflowTextSelection={false}
 		>
@@ -76,7 +108,7 @@
 								<div
 									bind:this={content}
 									{...props}
-									class="flex max-h-96 w-full gap-0.5 overflow-y-auto p-1"
+									class="combobox-panel flex w-full gap-0.5 overflow-y-auto p-1"
 									in:fly={dropIn}
 									out:fade={dropOut}
 								>
@@ -118,3 +150,11 @@
 		</Combobox.Content>
 	</Combobox.Portal>
 </Combobox.Root>
+
+<style>
+	/* the floating layer reports the space left on the chosen side, so the panel
+	   never extends past the window edge, even when the window is very short */
+	.combobox-panel {
+		max-height: min(24rem, var(--bits-combobox-content-available-height, 24rem));
+	}
+</style>

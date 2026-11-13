@@ -63,13 +63,9 @@
 		};
 
 		const update = () => {
-			// the floating layer only exposes its available height through a CSS
-			// variable, which is not always resolved; cap the panel from the
-			// viewport directly so it always stays inside the window
-			const viewportRoom = window.innerHeight - panel.getBoundingClientRect().top - 8;
-			const maxHeight = `${Math.min(24 * 16, Math.max(0, viewportRoom))}px`;
-			if (panel.style.maxHeight !== maxHeight) panel.style.maxHeight = maxHeight;
-
+			// the panel caps itself with the floating layer's available-height
+			// variable, which follows the final placement; this only drives the
+			// fade masks from the actual scroll position
 			const maxScroll = actualScroller.scrollHeight - actualScroller.clientHeight;
 			const nextTop = actualScroller.scrollTop > 1 ? FADE_SIZE : 0;
 			const nextBottom = maxScroll - actualScroller.scrollTop > 1 ? FADE_SIZE : 0;
