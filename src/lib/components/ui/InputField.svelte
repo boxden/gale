@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { HTMLInputAttributes } from 'svelte/elements';
+	import { syncUserInvalid } from '$lib/actions/user-invalid';
 
 	type Props = {
 		value?: string;
@@ -24,6 +25,7 @@
 <input
 	type="text"
 	bind:value
+	use:syncUserInvalid
 	onkeydown={(evt) => {
 		if (evt.key === 'Enter') {
 			onsubmit?.(value);

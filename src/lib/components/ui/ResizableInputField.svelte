@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { HTMLTextareaAttributes } from 'svelte/elements';
 	import { rememberScroll } from '$lib/scrollMemory';
+	import { syncUserInvalid } from '$lib/actions/user-invalid';
 
 	type Props = {
 		value: string;
@@ -168,6 +169,7 @@
 		<textarea
 			bind:this={textarea}
 			bind:value
+			use:syncUserInvalid
 			use:rememberScroll={scrollKey ?? null}
 			use:rememberSize={scrollKey}
 			{...restProps}

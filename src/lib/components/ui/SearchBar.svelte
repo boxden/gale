@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from '@iconify/svelte';
+	import { syncUserInvalid } from '$lib/actions/user-invalid';
 
 	type Props = {
 		value: string;
@@ -14,6 +15,7 @@
 
 <input
 	type="text"
+	use:syncUserInvalid
 	class="valid:focus:ring-accent-600 text-primary-700 placeholder-primary-500 hover:ring-primary-400 bg-primary-100 w-full truncate rounded-lg px-10 py-1.5 user-invalid:ring-red-500 hover:ring-1 focus:ring-2 focus:outline-hidden text-{size} dark:bg-primary-900 dark:valid:focus:ring-accent-500 dark:text-primary-300 dark:placeholder-primary-400 dark:hover:ring-primary-500"
 	bind:value
 	{onkeydown}
