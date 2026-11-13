@@ -8,7 +8,7 @@ use tauri::{AppHandle, command};
 use tracing::warn;
 use uuid::Uuid;
 
-use super::{Dependant, Profile, actions::ActionResult};
+use super::{Dependant, Profile, actions::ActionResult, server};
 use crate::{
     game::{self, Game, platform::Platform},
     profile::{FrontendManagedGame, query::FrontendProfileMod},
@@ -22,6 +22,13 @@ use crate::{
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct FrontendDedicatedServer {
+    platforms: Vec<Platform>,
+    default_port: u16,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FrontendGame {
     name: &'static str,
     slug: &'static str,
@@ -29,6 +36,7 @@ pub struct FrontendGame {
     mod_loader: &'static str,
     platforms: Vec<Platform>,
     backends: Vec<Backend>,
+    dedicated_server: Option<FrontendDedicatedServer>,
 }
 
 impl From<Game> for FrontendGame {
@@ -42,6 +50,12 @@ impl From<Game> for FrontendGame {
             mod_loader: value.mod_loader.as_str(),
             platforms,
             backends: value.backends.clone(),
+            dedicated_server: value.dedicated_server.as_ref().map(|server| {
+                FrontendDedicatedServer {
+                    platforms: server.platforms.iter().collect(),
+                    default_port: server.default_port,
+                }
+            }),
         }
     }
 }
@@ -243,6 +257,8 @@ pub fn create_profile(name: String, override_path: Option<PathBuf>, app: AppHand
 
 #[command]
 pub fn delete_profile(id: i64, app: AppHandle) -> Result<()> {
+    server::ensure_profile_unlocked(&app, id)?;
+
     let mut manager = app.lock_manager();
     let game = manager.active_game_mut();
 
@@ -256,6 +272,8 @@ pub fn delete_profile(id: i64, app: AppHandle) -> Result<()> {
 
 #[command]
 pub fn rename_profile(name: String, app: AppHandle) -> Result<()> {
+    server::ensure_active_profile_unlocked(&app)?;
+
     let mut manager = app.lock_manager();
     let game = manager.active_game_mut();
 
@@ -302,6 +320,8 @@ fn mod_action_command<F>(app: AppHandle, action: F) -> Result<ActionResult>
 where
     F: FnOnce(&mut Profile, &Thunderstore) -> eyre::Result<ActionResult>,
 {
+    server::ensure_active_profile_unlocked(&app)?;
+
     let mut manager = app.lock_manager();
     let thunderstore = app.lock_thunderstore();
 
@@ -317,6 +337,8 @@ where
 
 #[command]
 pub fn force_remove_mods(uuids: Vec<Uuid>, app: AppHandle) -> Result<()> {
+    server::ensure_active_profile_unlocked(&app)?;
+
     let mut manager = app.lock_manager();
 
     let profile = manager.active_profile_mut();
@@ -331,6 +353,8 @@ pub fn force_remove_mods(uuids: Vec<Uuid>, app: AppHandle) -> Result<()> {
 
 #[command]
 pub fn set_all_mods_state(enable: bool, app: AppHandle) -> Result<usize> {
+    server::ensure_active_profile_unlocked(&app)?;
+
     let mut manager = app.lock_manager();
 
     let profile = manager.active_profile_mut();
@@ -354,6 +378,8 @@ pub fn set_all_mods_state(enable: bool, app: AppHandle) -> Result<usize> {
 
 #[command]
 pub fn remove_disabled_mods(app: AppHandle) -> Result<usize> {
+    server::ensure_active_profile_unlocked(&app)?;
+
     let mut manager = app.lock_manager();
 
     let profile = manager.active_profile_mut();
@@ -377,6 +403,8 @@ pub fn remove_disabled_mods(app: AppHandle) -> Result<usize> {
 
 #[command]
 pub fn force_toggle_mods(uuids: Vec<Uuid>, app: AppHandle) -> Result<()> {
+    server::ensure_active_profile_unlocked(&app)?;
+
     let mut manager = app.lock_manager();
 
     let profile = manager.active_profile_mut();
@@ -495,6 +523,8 @@ pub async fn get_local_markdown(
 
 #[command]
 pub fn set_custom_args(custom_args: String, app: AppHandle) -> Result<()> {
+    server::ensure_active_profile_unlocked(&app)?;
+
     let mut manager = app.lock_manager();
     let profile = manager.active_profile_mut();
     profile.custom_args = custom_args;
@@ -505,6 +535,8 @@ pub fn set_custom_args(custom_args: String, app: AppHandle) -> Result<()> {
 
 #[command]
 pub fn set_profile_path(new_path: PathBuf, profile_id: i64, app: AppHandle) -> Result<()> {
+    server::ensure_profile_unlocked(&app, profile_id)?;
+
     let mut manager = app.lock_manager();
     let game = manager.active_game_mut();
 
@@ -523,6 +555,8 @@ pub fn set_profile_path(new_path: PathBuf, profile_id: i64, app: AppHandle) -> R
 
 #[command]
 pub fn forget_profile(profile_id: i64, app: AppHandle) -> Result<()> {
+    server::ensure_profile_unlocked(&app, profile_id)?;
+
     let mut manager = app.lock_manager();
     let game = manager.active_game_mut();
 

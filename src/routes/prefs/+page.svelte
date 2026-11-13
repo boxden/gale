@@ -31,6 +31,7 @@
 	import ColorPrefs from '$lib/components/prefs/ColorPrefs.svelte';
 	import ExportFilesDialog from '$lib/components/dialogs/ExportFilesDialog.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
+	import ServerSettingsPref from '$lib/components/prefs/ServerSettingsPref.svelte';
 
 	let gameSlug = $derived(games.active?.slug ?? '');
 
@@ -142,6 +143,10 @@
 					}}
 				/>
 			</div>
+
+			{#if games.active?.dedicatedServer}
+				<ServerSettingsPref />
+			{/if}
 
 			<SmallHeading>{m.prefs_miscellaneous_title()}</SmallHeading>
 

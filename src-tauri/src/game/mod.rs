@@ -165,6 +165,21 @@ pub fn last_updated() -> DateTime<Utc> {
     GAMES.0
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct DedicatedServer<'a> {
+    #[serde(borrow, default)]
+    pub platforms: Platforms<'a>,
+
+    pub default_port: u16,
+
+    #[serde(borrow, default)]
+    pub client_only_categories: Vec<&'a str>,
+
+    #[serde(borrow, default)]
+    pub server_categories: Vec<&'a str>,
+}
+
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 struct JsonGame<'a> {
@@ -188,6 +203,9 @@ struct JsonGame<'a> {
     #[serde(borrow, default)]
     platforms: Platforms<'a>,
 
+    #[serde(borrow, default)]
+    dedicated_server: Option<DedicatedServer<'a>>,
+
     #[serde(default)]
     backends: Option<Vec<Backend>>,
 }
@@ -202,6 +220,7 @@ pub struct GameData<'a> {
     pub server: bool,
     pub mod_loader: ModLoader<'a>,
     pub platforms: Platforms<'a>,
+    pub dedicated_server: Option<DedicatedServer<'a>>,
     pub backends: Vec<Backend>,
 }
 
@@ -215,6 +234,7 @@ impl<'a> From<JsonGame<'a>> for GameData<'a> {
             r2_dir_name,
             mod_loader,
             platforms,
+            dedicated_server,
             backends,
         } = value;
 
@@ -236,6 +256,7 @@ impl<'a> From<JsonGame<'a>> for GameData<'a> {
             server,
             mod_loader,
             platforms,
+            dedicated_server,
             backends: backends.unwrap_or(vec![Backend::Thunderstore]),
         }
     }
