@@ -16,13 +16,14 @@
 	let active = $derived(page.url.pathname === to);
 	let hasOutline = $derived(outline && !active);
 
-	const commonClasses = 'relative flex items-center rounded-lg p-2.5 text-3xl';
+	const commonClasses = 'relative flex select-none items-center rounded-lg p-2.5 text-3xl';
 </script>
 
 <Tooltip text={tooltip} side="right">
 	{#if disabled}
 		<button
 			disabled
+			draggable="false"
 			class={[
 				commonClasses,
 				'text-primary-300 dark:text-primary-500 cursor-not-allowed opacity-50'
@@ -33,6 +34,7 @@
 	{:else}
 		<a
 			href={to}
+			draggable="false"
 			class={[
 				active
 					? 'text-accent-500 dark:bg-primary-800 bg-primary-200 font-semibold'
