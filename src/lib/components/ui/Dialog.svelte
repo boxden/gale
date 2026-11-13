@@ -90,19 +90,32 @@
 					<div
 						class={[
 							large ? 'max-w-240' : 'max-w-140',
-							noscroll ? 'flex flex-col overflow-y-hidden' : 'overflow-y-auto',
+							noscroll ? 'flex flex-col overflow-y-hidden' : 'flex flex-col overflow-hidden',
 							selectNone && 'select-none',
 							'border-primary-300 dark:border-primary-600 dark:bg-primary-800 pointer-events-auto relative z-30 max-h-[85%] w-[85%] overflow-x-hidden rounded-xl border bg-white p-6 shadow-xl'
 						]}
 					>
-						{#if title}
-							<Dialog.Title
-								class="text-primary-900 w-full pr-10 text-2xl font-bold wrap-break-word dark:text-white"
-								>{title}</Dialog.Title
-							>
-						{/if}
+						{#if noscroll}
+							{#if title}
+								<Dialog.Title
+									class="text-primary-900 w-full pr-10 text-2xl font-bold wrap-break-word dark:text-white"
+									>{title}</Dialog.Title
+								>
+							{/if}
 
-						{@render children?.()}
+							{@render children?.()}
+						{:else}
+							<div class="-mr-4 min-h-0 flex-1 overflow-x-hidden overflow-y-auto py-0.5 pr-3 pl-1">
+								{#if title}
+									<Dialog.Title
+										class="text-primary-900 w-full pr-10 text-2xl font-bold wrap-break-word dark:text-white"
+										>{title}</Dialog.Title
+									>
+								{/if}
+
+								{@render children?.()}
+							</div>
+						{/if}
 
 						{#if canClose}
 							<button
