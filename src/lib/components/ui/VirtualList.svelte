@@ -374,13 +374,23 @@
 		const remaining = items.length - end;
 		average_height = end > 0 ? y / end : 0;
 
-		// fill unmeasured slots with the height of the nearest measured row
-		// above — row heights are locally similar, so propagating the last
-		// real measurement is much more accurate than the global average.
-		// Inaccurate estimates here inflate/deflate padTop and make the
-		// scroll anchoring compensation pin the content in place.
+		// Fill unmeasured slots near the current window with the nearest
+		// measured height. Scanning the whole catalog on every scroll frame
+		// is O(n) and becomes visible on very large lists, while only the
+		// neighbourhood is needed for accurate nearby estimates.
+		const fillStart = Math.max(0, start - 100);
+		const fillEnd = Math.min(items.length, end + 200);
+
 		let lastHeight = average_height || 0;
-		for (let j = 0; j < items.length; j += 1) {
+		for (let j = fillStart - 1; j >= Math.max(0, fillStart - 100); j -= 1) {
+			const h = heightMap[j];
+			if (h) {
+				lastHeight = h;
+				break;
+			}
+		}
+
+		for (let j = fillStart; j < fillEnd; j += 1) {
 			const h = heightMap[j];
 			if (h) {
 				lastHeight = h;
