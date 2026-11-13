@@ -45,7 +45,7 @@
 	import HelpCard from '$lib/components/ui/HelpCard.svelte';
 	import config from '$lib/state/config.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
-	import { untrack } from 'svelte';
+	import { onDestroy, untrack } from 'svelte';
 	import ForeignDownloadDialog from '$lib/components/dialogs/ForeignDownloadDialog.svelte';
 	import { pushInfoToast } from '$lib/toast';
 
@@ -136,9 +136,7 @@
 	let totalModCount = $state(hasCachedQuery ? cachedTotalModCount : 0);
 	let unknownMods: Dependant[] = $state(hasCachedQuery ? cachedUnknownMods : []);
 	// map from package uuids to updates
-	let updates: Map<string, AvailableUpdate> = $state(
-		hasCachedQuery ? cachedUpdates : new Map()
-	);
+	let updates: Map<string, AvailableUpdate> = $state(hasCachedQuery ? cachedUpdates : new Map());
 
 	let selectedMod: ProfileMod | null = $state(
 		hasCachedQuery && cachedSelectedUuid !== null
@@ -158,6 +156,7 @@
 	let hasRefreshed = $state(hasCachedQuery);
 
 	let refreshPromise: Promise<void> | null = $state(null);
+	let refreshPending = false;
 
 	let foreignDownloadDialogOpen = $state(false);
 
@@ -165,37 +164,42 @@
 		if (refreshPromise !== null) {
 			// make sure if this function is awaited while already refreshing, we wait until
 			// the refresh is done before returning so the caller sees the fresh values
+			refreshPending = true;
 			await refreshPromise;
 			return;
 		}
 
 		refreshPromise = (async () => {
-			const profileId = profiles.active?.id ?? null;
-			const result = await api.profile.query({ ...profileQuery.current, maxCount: null });
+			do {
+				refreshPending = false;
 
-			const updateMap = new Map(
-				result.updates.map((update) => [update.updatedId.packageUuid, update])
-			);
+				const profileId = profiles.active?.id ?? null;
+				const result = await api.profile.query({ ...profileQuery.current, maxCount: null });
 
-			mods = result.mods;
-			items = result.mods.map((mod) => ({ type: 'mod', mod }));
-			totalModCount = result.totalModCount;
-			unknownMods = result.unknownMods;
-			updates = updateMap;
+				const updateMap = new Map(
+					result.updates.map((update) => [update.updatedId.packageUuid, update])
+				);
 
-			cachedProfileId = profileId;
-			cachedMods = mods;
-			cachedTotalModCount = totalModCount;
-			cachedUnknownMods = unknownMods;
-			cachedUpdates = updateMap;
+				mods = result.mods;
+				items = result.mods.map((mod) => ({ type: 'mod', mod }));
+				totalModCount = result.totalModCount;
+				unknownMods = result.unknownMods;
+				updates = updateMap;
 
-			const selectedUuid = selectedMod?.data.uuid ?? cachedSelectedUuid;
-			selectedMod = selectedUuid
-				? (mods.find((mod) => mod.data.uuid === selectedUuid) ?? null)
-				: null;
-			cachedSelectedUuid = selectedMod?.data.uuid ?? null;
+				cachedProfileId = profileId;
+				cachedMods = mods;
+				cachedTotalModCount = totalModCount;
+				cachedUnknownMods = unknownMods;
+				cachedUpdates = updateMap;
 
-			hasRefreshed = true;
+				const selectedUuid = selectedMod?.data.uuid ?? cachedSelectedUuid;
+				selectedMod = selectedUuid
+					? (mods.find((mod) => mod.data.uuid === selectedUuid) ?? null)
+					: null;
+				cachedSelectedUuid = selectedMod?.data.uuid ?? null;
+
+				hasRefreshed = true;
+			} while (refreshPending);
 		})();
 
 		await refreshPromise;
@@ -288,11 +292,50 @@
 		await emit('reorder_mod', { uuid: item.mod.data.uuid, delta });
 	}
 
+	// A profile_changed event fires once per installed mod, so refreshing the
+	// whole list on each one makes the window drag while a large batch installs.
+	// Switch profile and query changes refresh immediately; same-profile updates
+	// are coalesced into one trailing query.
+	let lastProfileId = untrack(() => profiles.active?.id ?? null);
+	let lastQuery = untrack(() => JSON.stringify(profileQuery.current));
+	let profileRefreshTimer: ReturnType<typeof setTimeout> | undefined;
+	let firstProfileRefresh = true;
+
 	$effect(() => {
-		profiles.active;
+		const profileId = profiles.active?.id ?? null;
 		// read all fields of profileQuery.current to trigger the effect when any of them change
-		JSON.stringify(profileQuery.current);
-		untrack(() => refresh());
+		const query = JSON.stringify(profileQuery.current);
+
+		if (firstProfileRefresh) {
+			firstProfileRefresh = false;
+			lastProfileId = profileId;
+			lastQuery = query;
+			untrack(() => refresh());
+			return;
+		}
+
+		if (profileId !== lastProfileId || query !== lastQuery) {
+			lastProfileId = profileId;
+			lastQuery = query;
+
+			if (profileRefreshTimer !== undefined) {
+				clearTimeout(profileRefreshTimer);
+				profileRefreshTimer = undefined;
+			}
+
+			untrack(() => refresh());
+			return;
+		}
+
+		if (profileRefreshTimer !== undefined) clearTimeout(profileRefreshTimer);
+		profileRefreshTimer = setTimeout(() => {
+			profileRefreshTimer = undefined;
+			untrack(() => refresh());
+		}, 500);
+	});
+
+	onDestroy(() => {
+		if (profileRefreshTimer !== undefined) clearTimeout(profileRefreshTimer);
 	});
 
 	let reorderable = $derived(
@@ -355,8 +398,7 @@
 							update={updates.get(mod.data.uuid)}
 							selected={selectedMod?.data.uuid === mod.data.uuid}
 							ontoggle={(newState) => toggleMod(mod, newState)}
-							onclick={() =>
-								selectMod(selectedMod?.data.uuid === mod.data.uuid ? null : mod)}
+							onclick={() => selectMod(selectedMod?.data.uuid === mod.data.uuid ? null : mod)}
 						/>
 					{/snippet}
 				</ReorderableList>

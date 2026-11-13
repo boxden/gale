@@ -17,7 +17,7 @@
 
 	import ModList from '$lib/components/mod-list/ModList.svelte';
 
-	import { onMount, untrack } from 'svelte';
+	import { onDestroy, onMount, untrack } from 'svelte';
 	import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 	import ModListItem from '$lib/components/mod-list/ModListItem.svelte';
 	import ProfileLockedBanner from '$lib/components/mod-list/ProfileLockedBanner.svelte';
@@ -107,6 +107,7 @@
 
 	let hasRefreshed = $state(false);
 	let refreshing = false;
+	let refreshPending = false;
 
 	function itemUuid(item: BrowsedMod) {
 		return item.data.thunderstore?.uuid ?? item.data.hexium?.uuid;
@@ -117,21 +118,28 @@
 	}
 
 	async function refresh() {
-		if (refreshing) return;
-		refreshing = true;
-
-		cacheMods(await api.thunderstore.query({ ...modQuery.current, maxCount }));
-		if (cachedSelectedKey) {
-			const found = findItemByUuid(cachedSelectedKey);
-
-			if (found) {
-				// isInstalled might have changed
-				selectedMod = found;
-			} else if (selectedMod) {
-				selectedMod = null;
-				cachedSelectedKey = null;
-			}
+		if (refreshing) {
+			refreshPending = true;
+			return;
 		}
+
+		refreshing = true;
+		do {
+			refreshPending = false;
+
+			cacheMods(await api.thunderstore.query({ ...modQuery.current, maxCount }));
+			if (cachedSelectedKey) {
+				const found = findItemByUuid(cachedSelectedKey);
+
+				if (found) {
+					// isInstalled might have changed
+					selectedMod = found;
+				} else if (selectedMod) {
+					selectedMod = null;
+					cachedSelectedKey = null;
+				}
+			}
+		} while (refreshPending);
 
 		refreshing = false;
 		hasRefreshed = true;
@@ -175,13 +183,58 @@
 		}
 	}
 
+	// A profile_changed event fires once per installed mod, so refreshing the
+	// browse query on every one of them makes the window drag while a large
+	// batch installs. Profile and query changes refresh immediately; mod-count
+	// updates from an install are coalesced into one trailing query.
+	let lastProfileId = untrack(() => profiles.activeId);
+	let lastQuery = untrack(() => JSON.stringify(modQuery.current));
+	let lastMaxCount = untrack(() => maxCount);
+	let profileRefreshTimer: ReturnType<typeof setTimeout> | undefined;
+	let firstRefresh = true;
+
 	$effect(() => {
-		profiles.active;
+		const profileId = profiles.activeId;
 		// read all fields of modQuery.current to trigger the effect when any of them change
-		JSON.stringify(modQuery.current);
-		if (maxCount > 0) {
-			untrack(() => refresh());
+		const query = JSON.stringify(modQuery.current);
+		const count = maxCount;
+		// read the profile object so profile_changed updates schedule a refresh
+		profiles.active;
+
+		if (firstRefresh) {
+			firstRefresh = false;
+			lastProfileId = profileId;
+			lastQuery = query;
+			lastMaxCount = count;
+			if (count > 0) untrack(() => refresh());
+			return;
 		}
+
+		if (profileId !== lastProfileId || query !== lastQuery || count !== lastMaxCount) {
+			lastProfileId = profileId;
+			lastQuery = query;
+			lastMaxCount = count;
+
+			if (profileRefreshTimer !== undefined) {
+				clearTimeout(profileRefreshTimer);
+				profileRefreshTimer = undefined;
+			}
+
+			if (count > 0) untrack(() => refresh());
+			return;
+		}
+
+		if (count <= 0) return;
+
+		if (profileRefreshTimer !== undefined) clearTimeout(profileRefreshTimer);
+		profileRefreshTimer = setTimeout(() => {
+			profileRefreshTimer = undefined;
+			untrack(() => refresh());
+		}, 500);
+	});
+
+	onDestroy(() => {
+		if (profileRefreshTimer !== undefined) clearTimeout(profileRefreshTimer);
 	});
 
 	let locked = $derived(profiles.activeInstallAndConfigLocked);
