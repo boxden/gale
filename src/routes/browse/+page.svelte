@@ -87,15 +87,18 @@
 	let installId: ModId;
 	let unlistenFromQuery: UnlistenFn | undefined;
 
-	function cacheMods(newMods: BrowsedMod[]) {
-		mods = newMods;
+	function cacheMods(newMods: BrowsedMod[], game: string | null) {
 		cachedMods = newMods;
-		cachedGame = games.active?.slug ?? null;
+		cachedGame = game;
+
+		// a response for a game that is no longer active must not paint over
+		// the current catalog; its cache entry stays valid for the next visit
+		if (game === (games.active?.slug ?? null)) mods = newMods;
 	}
 
 	onMount(() => {
 		listen<BrowsedMod[]>('mod_query_result', (evt) => {
-			cacheMods(evt.payload);
+			cacheMods(evt.payload, games.active?.slug ?? null);
 		}).then((unlisten) => {
 			unlistenFromQuery = unlisten;
 		});
@@ -129,7 +132,9 @@
 			do {
 				refreshPending = false;
 
-				cacheMods(await api.thunderstore.query({ ...modQuery.current, maxCount }));
+				const game = games.active?.slug ?? null;
+
+				cacheMods(await api.thunderstore.query({ ...modQuery.current, maxCount }), game);
 				if (cachedSelectedKey) {
 					const found = findItemByUuid(cachedSelectedKey);
 
