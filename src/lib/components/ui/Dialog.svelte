@@ -82,6 +82,7 @@
 			bind:ref={contentRef}
 			onOpenAutoFocus={handleOpenAutoFocus}
 			interactOutsideBehavior={canClose && confirmClose === null ? 'close' : 'ignore'}
+			preventOverflowTextSelection={false}
 			class="pointer-events-none"
 		>
 			{#if open}

@@ -60,7 +60,13 @@
 		>
 	</div>
 	<Combobox.Portal>
-		<Combobox.Content forceMount side="bottom" avoidCollisions={false} collisionPadding={8}>
+		<Combobox.Content
+			forceMount
+			side="bottom"
+			avoidCollisions={false}
+			collisionPadding={8}
+			preventOverflowTextSelection={false}
+		>
 			{#snippet child({ wrapperProps, props, open })}
 				<div {...wrapperProps}>
 					{#if open}

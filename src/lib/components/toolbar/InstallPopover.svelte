@@ -143,7 +143,7 @@
 			</div>
 		{/if}
 	</Popover.Trigger>
-	<Popover.Content forceMount>
+	<Popover.Content forceMount preventOverflowTextSelection={false}>
 		{#snippet child({ wrapperProps, props, open })}
 			<div {...wrapperProps}>
 				{#if open}

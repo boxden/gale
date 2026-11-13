@@ -32,7 +32,7 @@
 
 		<DropdownArrow {open} />
 	</DropdownMenu.Trigger>
-	<DropdownMenu.Content forceMount>
+	<DropdownMenu.Content forceMount preventOverflowTextSelection={false}>
 		{#snippet child({ wrapperProps, props, open })}
 			<div {...wrapperProps}>
 				{#if open}

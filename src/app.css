@@ -23,6 +23,21 @@
 		overflow: hidden;
 		position: fixed;
 		inset: 0;
+		-webkit-user-select: none;
+		user-select: none;
+	}
+
+	/* UI chrome doesn't select like text, but form fields and copyable
+	   content stay selectable */
+	input,
+	textarea,
+	[contenteditable='true'],
+	[contenteditable='plaintext-only'],
+	pre,
+	code,
+	.markdown {
+		-webkit-user-select: text;
+		user-select: text;
 	}
 
 	main {

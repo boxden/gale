@@ -42,7 +42,7 @@
 </script>
 
 {#if items.length > 0}
-	<Content>
+	<Content preventOverflowTextSelection={false}>
 		{#snippet child({ wrapperProps, props, open })}
 			<div {...wrapperProps}>
 				{#if open}
