@@ -359,10 +359,21 @@ impl Db {
     }
 
     pub fn save_game(&self, game: &ManagedGame) -> Result<()> {
-        self.with_transaction(|tx| self.save_games(tx, iter::once(game)))
+        // an explicitly saved game is always written, even when it has no
+        // profiles yet: unfavoriting one must be able to clear the row written
+        // when it was favorited, while bulk saves skip placeholders
+        self.with_transaction(|tx| self.upsert_games(tx, iter::once(game)))
     }
 
     fn save_games<'a>(
+        &self,
+        tx: &rusqlite::Transaction,
+        games: impl Iterator<Item = &'a ManagedGame>,
+    ) -> Result<()> {
+        self.upsert_games(tx, games.filter(|game| game.materialized || game.favorite))
+    }
+
+    fn upsert_games<'a>(
         &self,
         tx: &rusqlite::Transaction,
         games: impl Iterator<Item = &'a ManagedGame>,
@@ -372,7 +383,7 @@ impl Db {
                 VALUES (?, ?, ?, ?)",
         )?;
 
-        for game in games.filter(|game| game.materialized || game.favorite) {
+        for game in games {
             stmt.execute(params![
                 game.id,
                 game.game.slug,
