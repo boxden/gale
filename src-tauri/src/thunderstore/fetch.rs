@@ -177,13 +177,13 @@ async fn fetch_single_packages(
                 return Ok(0);
             }
             res = async {
-                // the index is a small gzipped list of content-addressed chunk
-                // URLs; caching it lets an unchanged list revalidate without
-                // re-downloading the package chunks
+                // the index must never be served from the cache: it 302-redirects
+                // to an immutable blob whose 31-day max-age would otherwise be
+                // stored under the index URL, freezing the catalog for a month
                 let response = app
                     .http()
                     .get(&index_url)
-                    .with_extension(CacheMode::Default)
+                    .with_extension(CacheMode::NoStore)
                     .send()
                     .await?;
                 let bytes = response.error_for_status()?.bytes().await?;
@@ -194,14 +194,27 @@ async fn fetch_single_packages(
 
         let urls: Vec<String> = serde_json::from_reader(GzDecoder::new(&bytes[..]))?;
 
+        // The index lists content-addressed chunks, so an unchanged index means
+        // the package map already has exactly these packages; re-parsing the
+        // whole catalog would only reproduce it.
+        if !write_directly {
+            let state = app.lock_thunderstore();
+
+            if state.backend(backend).last_index.as_deref() == Some(urls.as_slice()) {
+                debug!("package index for {} is unchanged, skipping fetch", backend);
+                return Ok(state.backend(backend).packages.len());
+            }
+        }
+
         let mut package_count = 0;
         let mut package_buffer = IndexMap::new();
 
         let (tx, mut rx) = mpsc::channel(4);
 
         let handle = app.to_owned();
+        let chunk_urls = urls.clone();
         let chunk_fetcher = tokio::spawn(async move {
-            if let Err(err) = fetch_chunks(tx, urls, handle).await {
+            if let Err(err) = fetch_chunks(tx, chunk_urls, handle).await {
                 error!("failed to request package listing chunks: {err:#}");
             }
         });
@@ -275,6 +288,7 @@ async fn fetch_single_packages(
 
         let backend_state = state.backend_mut(backend);
         backend_state.packages_fetched = true;
+        backend_state.last_index = Some(urls);
 
         if !write_directly {
             backend_state.packages = package_buffer;

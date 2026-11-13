@@ -180,6 +180,9 @@ pub struct ThunderstoreBackend {
     /// Whether packages have been succesfully fetched at least one since
     /// the last call to [`crate::thunderstore::Thunderstore::switch_game`].
     pub(super) packages_fetched: bool,
+    /// Chunk urls of the index the package map was last built from; an
+    /// unchanged index means the map already has the same packages.
+    pub(super) last_index: Option<Vec<String>>,
     /// Whether a [`fetch_mods`] task is currently running.
     is_fetching: bool,
     // IndexMap is not used for ordering here, but for fast iteration,
@@ -192,6 +195,7 @@ impl ThunderstoreBackend {
     pub fn new(backend: Backend) -> Self {
         Self {
             packages_fetched: false,
+            last_index: None,
             is_fetching: false,
             packages: IndexMap::new(),
             backend,
@@ -270,6 +274,7 @@ impl ThunderstoreBackend {
     pub fn clear_packages(&mut self) {
         self.is_fetching = false;
         self.packages_fetched = false;
+        self.last_index = None;
         self.packages = IndexMap::new();
     }
 }
