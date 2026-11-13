@@ -78,6 +78,7 @@
 				},
 				{
 					text: m.menuBar_file_item_7(),
+					accelerator: 'F5',
 					onclick: api.thunderstore.triggerModFetch
 				}
 			]
@@ -453,7 +454,27 @@
 	}
 
 	onMount(async () => {
-		document.onkeydown = ({ key, ctrlKey }) => {
+		document.onkeydown = (event) => {
+			const { key, ctrlKey, metaKey } = event;
+
+			// F5 fetches the catalog instead of reloading the webview
+			if (key === 'F5') {
+				event.preventDefault();
+
+				// the native menu's F5 accelerator already fetches
+				if (!useNativeMenu.current) {
+					void api.thunderstore.triggerModFetch();
+				}
+
+				return;
+			}
+
+			// F5 is the only refresh: never let the webview reload and lose its state
+			if (key.toLowerCase() === 'r' && (ctrlKey || metaKey)) {
+				event.preventDefault();
+				return;
+			}
+
 			if (useNativeMenu.current) return; // Tauri handles shortcuts to the native menu
 
 			if (key === 'F2') {
